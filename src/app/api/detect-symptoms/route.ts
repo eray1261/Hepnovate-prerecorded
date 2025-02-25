@@ -5,39 +5,43 @@ const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 const commonSymptoms = [
     'headache', 'fever', 'pain', 'nausea', 'cough', 
     'sore throat', 'fatigue', 'dizziness'
-  ];
-  
+];
+
 export async function POST(request: Request) {
   try {
     const { transcript } = await request.json();
 
-    // Enhanced prompt to better handle natural language
-    const prompt = `Extract medical information from this text: "${transcript}"
+    // Modified prompt 
+    const prompt = `[INST] You are a medical assistant. Extract medical information from this text and format it exactly as shown below. Only output the formatted data, no other text:
 
-List all symptoms and vital signs. Format your response exactly like this:
+"${transcript}"
+
+Format:
 Temperature: {number}°F
 Blood Pressure: {systolic}/{diastolic} mmHg
 Pulse: {number} bpm
 Symptoms: {symptom1}, {symptom2}, etc.
 
-Note: Convert any written numbers to digits (e.g., "one zero two" to "102")`;
+Convert any written numbers to digits (e.g., "one zero two" to "102"). [/INST]`;
 
     const response = await hf.request({
-      model: 'google/flan-t5-base',
+      model: 'mistralai/Mistral-7B-Instruct-v0.3',
       inputs: prompt,
       parameters: {
-        max_new_tokens: 150,
+        max_new_tokens: 256,
         temperature: 0.1,
-        top_p: 0.9,
+        top_p: 0.95,
+        do_sample: true,
+        return_full_text: false
       },
     });
 
     let detectedSymptoms: string[] = [];
     let vitals: { temperature: string | null; bloodPressure: string | null; pulse: string | null } = {
-        temperature: null,
-        bloodPressure: null,
-        pulse: null,
-      };      
+      temperature: null,
+      bloodPressure: null,
+      pulse: null,
+    };      
 
     try {
       let responseText = '';
@@ -47,7 +51,7 @@ Note: Convert any written numbers to digits (e.g., "one zero two" to "102")`;
         responseText = (response[0]?.generated_text || '').toLowerCase();
       }
 
-      // Enhanced temperature detection
+      // Enhanced temperature detection with support for written numbers
       const tempMatch = responseText.match(/temperature[:\s]*(\d+(?:\.\d+)?)/i) ||
         transcript.match(/temperature\s*(?:is|of)?\s*(?:one|two|three|four|five|six|seven|eight|nine|zero|\d+)(?:\s+(?:one|two|three|four|five|six|seven|eight|nine|zero|\d+))*\s*(?:fahrenheit|f)?/i);
       
@@ -76,13 +80,19 @@ Note: Convert any written numbers to digits (e.g., "one zero two" to "102")`;
         vitals.temperature = `${temp}°F`;
       }
 
-      // Enhanced symptom detection with common symptoms
-      const commonSymptoms = [
-        'headache', 'fever', 'pain', 'nausea', 'cough', 
-        'sore throat', 'fatigue', 'dizziness'
-      ];
+      // Blood pressure detection
+      const bpMatch = responseText.match(/blood pressure[:\s]*(\d+)\/(\d+)/i);
+      if (bpMatch) {
+        vitals.bloodPressure = `${bpMatch[1]}/${bpMatch[2]} mmHg`;
+      }
 
-      // First try to get symptoms from model response
+      // Pulse detection
+      const pulseMatch = responseText.match(/pulse[:\s]*(\d+)/i);
+      if (pulseMatch) {
+        vitals.pulse = `${pulseMatch[1]} bpm`;
+      }
+
+      // Symptom detection from model response
       const symptomsMatch = responseText.match(/symptoms[:\s]*([^\n]+)/i);
       if (symptomsMatch) {
         detectedSymptoms = symptomsMatch[1]
@@ -91,7 +101,7 @@ Note: Convert any written numbers to digits (e.g., "one zero two" to "102")`;
           .filter((s) => s.length > 0);
       }
 
-      // Then check transcript for additional symptoms
+      // Additional symptom detection from transcript
       const lowerTranscript = transcript.toLowerCase();
       commonSymptoms.forEach(symptom => {
         if (lowerTranscript.includes(symptom) && !detectedSymptoms.includes(symptom)) {
@@ -99,7 +109,7 @@ Note: Convert any written numbers to digits (e.g., "one zero two" to "102")`;
         }
       });
 
-      // If "fever" is mentioned or temperature is high (>99°F), add fever to symptoms
+      // Add fever to symptoms if temperature is high
       if (
         (lowerTranscript.includes('fever') || 
         (vitals.temperature && parseFloat(vitals.temperature) > 99)) && 

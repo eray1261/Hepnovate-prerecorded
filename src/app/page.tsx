@@ -444,12 +444,16 @@ export default function Home() {
 
                   {/* Next Button */}
                   <div className="flex justify-end mt-4">
-                    <button 
-                      onClick={() => router.push('/scan')}
-                      className="bg-[#80BCFF] text-white px-8 py-2 rounded-lg flex items-center gap-1"
-                    >
-                      Next <span className="text-lg">→</span>
-                    </button>
+                  <button 
+                    onClick={() => {
+                      // Convert symptoms array to URL-friendly format
+                      const symptomsParam = encodeURIComponent(symptoms.map(s => s.name).join(','));
+                      router.push(`/scan?symptoms=${symptomsParam}`);  // Changed from /scan-viewer to /scan
+                    }}
+                    className="bg-[#80BCFF] text-white px-8 py-2 rounded-lg flex items-center gap-1"
+                  >
+                    Next <span className="text-lg">→</span>
+                  </button>
                   </div>
                 </div>
               </Card>
