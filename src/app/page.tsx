@@ -6,6 +6,12 @@ import { Header } from "@/components/layout/Header"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/card"
 import { useRouter } from "next/navigation"
 import { parse } from "csv-parse"
+import { 
+  getCurrentDiagnosis, 
+  resetDiagnosisKeepSymptoms, 
+  storeCurrentDiagnosis,
+  DiagnosisResult
+} from "@/services/diagnosisStorage";
 
 
 type Symptom = {
@@ -50,49 +56,101 @@ export default function Home() {
   const websocketRef = useRef<WebSocket | null>(null)
   const router = useRouter()
   const [selectedPatientId, setSelectedPatientId] = useState('P1000')
+  const [patientIds, setPatientIds] = useState<string[]>(['P1000', 'P1001', 'P1002', 'P1003'])
   const [labResults, setLabResults] = useState<LabResult[]>([])
   const [medicalHistory, setMedicalHistory] = useState<MedicalHistory>({
     activeConditions: [],
     currentMedication: [],
   })
+  const [websocketConnected, setWebsocketConnected] = useState(false)
   const records: PatientRecord[] = [];
 
+  // Load saved data from localStorage on initial render
   useEffect(() => {
-    websocketRef.current = new WebSocket('ws://localhost:3001')
-    
-    websocketRef.current.onopen = () => {
-      console.log('WebSocket connected')
-    }
-
-    websocketRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      if (data.channel?.alternatives[0]?.transcript) {
-        const newTranscript = data.channel.alternatives[0].transcript
-        setTranscription(prev => prev + ' ' + newTranscript)
-        detectSymptomsAndVitals(newTranscript)
+    const savedDiagnosis = getCurrentDiagnosis();
+    if (savedDiagnosis) {
+      // Convert saved symptoms to the right format
+      if (savedDiagnosis.symptoms && savedDiagnosis.symptoms.length > 0) {
+        const formattedSymptoms = savedDiagnosis.symptoms.map(name => ({
+          name,
+          detected: true
+        }));
+        setSymptoms(formattedSymptoms);
+      }
+      
+      // Set saved vitals
+      if (savedDiagnosis.vitals) {
+        setVitals(savedDiagnosis.vitals);
       }
     }
+  }, []);
 
-    websocketRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error)
-      setError('Connection error. Please try again.')
+  // Save symptoms and vitals to localStorage whenever they change
+  useEffect(() => {
+    // Only save if there's something to save
+    if (symptoms.length > 0 || Object.keys(vitals).length > 0) {
+      const currentData: DiagnosisResult = {
+        diagnoses: [],
+        symptoms: symptoms.map(s => s.name),
+        vitals: vitals
+      };
+      storeCurrentDiagnosis(currentData);
     }
+  }, [symptoms, vitals]);
 
-    websocketRef.current.onclose = () => {
-      console.log('WebSocket disconnected')
+  useEffect(() => {
+    const initializeWebSocket = () => {
+      if (websocketRef.current) {
+        websocketRef.current.close();
+      }
 
-      
-    }
+      try {
+        websocketRef.current = new WebSocket('ws://localhost:3001');
+        
+        websocketRef.current.onopen = () => {
+          console.log('WebSocket connected');
+          setWebsocketConnected(true);
+          setError(null);
+        };
 
+        websocketRef.current.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.channel?.alternatives[0]?.transcript) {
+            const newTranscript = data.channel.alternatives[0].transcript;
+            setTranscription(prev => prev + ' ' + newTranscript);
+            detectSymptomsAndVitals(newTranscript);
+          }
+        };
+
+        websocketRef.current.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          setError('Connection error. Please try again.');
+          setWebsocketConnected(false);
+        };
+
+        websocketRef.current.onclose = () => {
+          console.log('WebSocket disconnected');
+          setWebsocketConnected(false);
+        };
+      } catch (err) {
+        console.error('Failed to initialize WebSocket:', err);
+        setError('Failed to initialize connection. Please refresh the page.');
+        setWebsocketConnected(false);
+      }
+    };
+
+    initializeWebSocket();
+
+    // Clean up WebSocket on component unmount
     return () => {
       if (websocketRef.current) {
-        websocketRef.current.close()
+        websocketRef.current.close();
       }
       if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop()
+        mediaRecorderRef.current.stop();
       }
-    }
-  }, [])
+    };
+  }, []); // Empty dependency array to run only once on mount
 
   useEffect(() => {
     const loadCSVData = async () => {
@@ -113,6 +171,12 @@ export default function Home() {
                 if (err) {
                     console.error("Lab Results parsing error:", err);
                     return;
+                }
+
+                // Extract all unique patient IDs
+                const uniquePatientIds = [...new Set(records.map(record => record['Patient ID']))];
+                if (uniquePatientIds.length > 0) {
+                    setPatientIds(uniquePatientIds);
                 }
 
                 const selectedPatientData = records.find(patient => patient['Patient ID'] === selectedPatientId);
@@ -211,39 +275,78 @@ export default function Home() {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorderRef.current = new MediaRecorder(stream)
+      // Ensure WebSocket is connected
+      if (!websocketConnected) {
+        setError("Connection not established. Trying to reconnect...");
+        if (websocketRef.current) {
+          websocketRef.current.close();
+        }
+        websocketRef.current = new WebSocket('ws://localhost:3001');
+        
+        // Wait for connection to establish before proceeding
+        await new Promise((resolve, reject) => {
+          if (!websocketRef.current) return reject("Failed to create WebSocket");
+          
+          websocketRef.current.onopen = () => {
+            setWebsocketConnected(true);
+            setError(null);
+            resolve(true);
+          };
+          
+          websocketRef.current.onerror = () => {
+            reject("Failed to connect to WebSocket server");
+          };
+          
+          // Set a timeout in case connection takes too long
+          setTimeout(() => reject("Connection timeout"), 5000);
+        });
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0 && websocketRef.current?.readyState === WebSocket.OPEN) {
-          websocketRef.current.send(event.data)
+          websocketRef.current.send(event.data);
         }
-      }
+      };
 
-      mediaRecorderRef.current.start(1000)
-      setIsRecording(true)
-      setError(null)
-      setTranscription('')
-      setSymptoms([])
-      setVitals({})
+      mediaRecorderRef.current.start(1000);
+      setIsRecording(true);
+      setError(null);
     } catch (err) {
-      setError("Failed to start recording. Please check your microphone permissions.")
-      console.error("Recording error:", err)
+      setError("Failed to start recording. Please check your microphone permissions or refresh the page.");
+      console.error("Recording error:", err);
     }
-  }
+  };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
       
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
-  }
+  };
+
+  // Reset function for symptoms, vitals, and transcription
+  const resetData = () => {
+    setSymptoms([]);
+    setVitals({});
+    setTranscription('');
+    
+    // Clear from localStorage but keep the structure
+    const emptyData: DiagnosisResult = {
+      diagnoses: [],
+      symptoms: [],
+      vitals: {}
+    };
+    storeCurrentDiagnosis(emptyData);
+  };
 
   const detectSymptomsAndVitals = async (transcript: string) => {
     try {
-      setIsAnalyzing(true)
+      setIsAnalyzing(true);
       
       const response = await fetch('/api/detect-symptoms', {
         method: 'POST',
@@ -251,11 +354,11 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ transcript })
-      })
+      });
   
-      if (!response.ok) throw new Error('Failed to detect medical information')
+      if (!response.ok) throw new Error('Failed to detect medical information');
       
-      const { symptoms: detectedSymptoms, vitals: detectedVitals } = await response.json()
+      const { symptoms: detectedSymptoms, vitals: detectedVitals } = await response.json();
       
       // Update symptoms with deduplication and filtering
       setSymptoms(prevSymptoms => {
@@ -278,40 +381,58 @@ export default function Home() {
           }));
         
         return [...prevSymptoms, ...newSymptoms];
-      })
+      });
   
       // Update vitals with validation
       if (detectedVitals) {
         setVitals(prev => {
-          const newVitals: Vitals = { ...prev }
+          const newVitals: Vitals = { ...prev };
           
           // Only update if we have valid values
           if (detectedVitals.temperature?.match(/^\d+(?:\.\d+)?°F$/)) {
-            newVitals.temperature = detectedVitals.temperature
+            newVitals.temperature = detectedVitals.temperature;
           }
           if (detectedVitals.bloodPressure?.match(/^\d+\/\d+\s*mmHg$/)) {
-            newVitals.bloodPressure = detectedVitals.bloodPressure
+            newVitals.bloodPressure = detectedVitals.bloodPressure;
           }
           if (detectedVitals.pulse?.match(/^\d+\s*bpm$/)) {
-            newVitals.pulse = detectedVitals.pulse
+            newVitals.pulse = detectedVitals.pulse;
           }
           
-          return newVitals
-        })
+          return newVitals;
+        });
       }
   
-      setIsAnalyzing(false)
+      setIsAnalyzing(false);
     } catch (error) {
-      console.error('Error detecting medical information:', error)
-      setError('Failed to analyze medical information')
-      setIsAnalyzing(false)
+      console.error('Error detecting medical information:', error);
+      setError('Failed to analyze medical information');
+      setIsAnalyzing(false);
     }
-  }
+  };
+
   return (
-    <main className="h-screen bg-white flex flex-col">
+    <main className="min-h-screen bg-white flex flex-col">
       <Header />
-      <div className="flex-1 container mx-auto p-4 overflow-hidden">
-        <div className="grid grid-cols-3 gap-4 h-full">
+      <div className="flex-1 container mx-auto p-4 overflow-y-auto">
+        {/* Patient ID Dropdown */}
+        <div className="flex justify-end mb-4">
+          <div className="flex items-center">
+            <label htmlFor="patient-select" className="mr-2 text-black">Patient ID:</label>
+            <select
+              id="patient-select"
+              value={selectedPatientId}
+              onChange={(e) => setSelectedPatientId(e.target.value)}
+              className="bg-white border border-gray-300 rounded-md px-3 py-1 text-black"
+            >
+              {patientIds.map(id => (
+                <option key={id} value={id}>{id}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Left Column - Expandable */}
           <div className="flex flex-col gap-4">
             <Card>
@@ -322,7 +443,7 @@ export default function Home() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="py-2">
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[250px] overflow-y-auto">
                   {symptoms.map((symptom) => (
                     <div 
                       key={symptom.name} 
@@ -364,19 +485,28 @@ export default function Home() {
             </Card>
           </div>
 
-          {/* Right Column - Fixed */}
-          <div className="col-span-2 h-full overflow-hidden">
-            <div className="flex flex-col gap-4 h-full">
+          {/* Right Column */}
+          <div className="md:col-span-2">
+            <div className="flex flex-col gap-4">
               <Card>
                 <CardHeader className="py-2 flex flex-row items-center justify-between">
                   <CardTitle className="text-[#80BCFF]">Live Transcription</CardTitle>
-                  <button 
-                    onClick={isRecording ? stopRecording : startRecording}
-                    className={`${isRecording ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-1 rounded-md flex items-center gap-2`}
-                  >
-                    <span className={`h-2 w-2 rounded-full bg-white ${isRecording ? 'animate-pulse' : ''}`}></span>
-                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={`${isRecording ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-1 rounded-md flex items-center gap-2`}
+                    >
+                      <span className={`h-2 w-2 rounded-full bg-white ${isRecording ? 'animate-pulse' : ''}`}></span>
+                      {isRecording ? 'Stop Recording' : 'Start Recording'}
+                    </button>
+                    <button 
+                      onClick={resetData}
+                      className="bg-gray-500 text-white px-4 py-1 rounded-md flex items-center gap-2"
+                      disabled={isRecording}
+                    >
+                      Reset
+                    </button>
+                  </div>
                 </CardHeader>
                 <CardContent className="py-2">
                   <div className="h-[150px] bg-gray-50 rounded-md p-3 text-black overflow-y-auto">
@@ -389,13 +519,13 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              <Card className="w-full flex-1 overflow-hidden">
+              <Card className="w-full">
                 <div className="m-4 p-4">
-                  <div className="grid grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Lab Results */}
                     <div>
                       <CardTitle className="text-[#80BCFF] mb-4">Recent Lab Results</CardTitle>
-                      <div className="space-y-2 text-black">
+                      <div className="space-y-2 text-black max-h-[300px] overflow-y-auto pr-2">
                         {labResults && labResults.length > 0 ? (
                           labResults.map((item, index) => (
                             <div key={index} className="flex justify-between items-center">
@@ -443,9 +573,17 @@ export default function Home() {
                   </div>
 
                   {/* Next Button */}
-                  <div className="flex justify-end mt-4">
+                  <div className="flex justify-end mt-8">
                   <button 
                     onClick={() => {
+                      // Store current symptoms and vitals before navigation
+                      const currentData: DiagnosisResult = {
+                        diagnoses: [],
+                        symptoms: symptoms.map(s => s.name),
+                        vitals: vitals
+                      };
+                      storeCurrentDiagnosis(currentData);
+                      
                       // Convert symptoms array to URL-friendly format
                       const symptomsParam = encodeURIComponent(symptoms.map(s => s.name).join(','));
                       router.push(`/scan?symptoms=${symptomsParam}`);  // Changed from /scan-viewer to /scan

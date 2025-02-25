@@ -1,99 +1,106 @@
-// services/diagnosisStorage.ts
+// Enhanced DiagnosisStorage Service to include all patient data
 
-/**
- * Types matching your existing diagnosis structure
- */
-export type Diagnosis = {
+// Define interfaces
+export type Vitals = {
+    temperature?: string;
+    bloodPressure?: string;
+    pulse?: string;
+    [key: string]: string | undefined; // Allow for other vitals
+  };
+  
+  export type LabResult = {
+    name: string;
+    value: string;
+    unit: string;
+  };
+  
+  export type MedicalCondition = {
+    condition: string;
+    date: string;
+  };
+  
+  export type Medication = {
+    name: string;
+    dosage: string;
+  };
+  
+  export type MedicalHistory = {
+    activeConditions: MedicalCondition[];
+    currentMedication: Medication[];
+  };
+  
+  export type Diagnosis = {
     name: string;
     confidence: number;
     findings: string[];
     differential: string[];
     plan: string[];
     severity: 'Mild' | 'Moderate' | 'Severe';
-  }
+  };
   
-  /**
-   * Structure for diagnosis result with additional image and symptom data
-   */
-  export interface DiagnosisResult {
+  // Enhanced DiagnosisResult type with additional properties
+  export type DiagnosisResult = {
     diagnoses: Diagnosis[];
-    imageData?: string;  // Base64 image data for reuse in feedback flow
-    symptoms?: string[]; // Symptoms for reuse in feedback flow
-  }
+    imageData?: string;     // Base64 image data
+    symptoms?: string[];    // Patient symptoms
+    vitals?: Vitals;        // Patient vitals
+    labResults?: LabResult[]; // Laboratory results
+    medicalHistory?: MedicalHistory; // Medical history
+    timestamp?: string;     // When diagnosis was created
+  };
   
-  // Storage keys
-  const CURRENT_DIAGNOSIS_KEY = 'diagnosisResult';
-  const DIAGNOSIS_HISTORY_KEY = 'diagnosisHistory';
-  const MAX_HISTORY_LENGTH = 5;
+  // Local storage key
+  const DIAGNOSIS_STORAGE_KEY = 'currentDiagnosis';
   
-  /**
-   * Stores the current diagnosis result
-   */
-  export const storeCurrentDiagnosis = (diagnosis: DiagnosisResult): void => {
-    localStorage.setItem(CURRENT_DIAGNOSIS_KEY, JSON.stringify(diagnosis));
-    
-    // Also add to history
+  // Store current diagnosis
+  export function storeCurrentDiagnosis(diagnosis: DiagnosisResult): void {
     try {
-      const historyJson = localStorage.getItem(DIAGNOSIS_HISTORY_KEY);
-      const history: Array<DiagnosisResult & { timestamp: string }> = historyJson ? JSON.parse(historyJson) : [];
-      
-      // Add timestamp to help identify it
-      const diagnosisWithTimestamp = {
-        ...diagnosis,
-        timestamp: new Date().toISOString()
-      };
-      
-      // Add to the beginning (most recent first)
-      history.unshift(diagnosisWithTimestamp);
-      
-      // Limit history size
-      if (history.length > MAX_HISTORY_LENGTH) {
-        history.pop();
+      // Add timestamp if not present
+      if (!diagnosis.timestamp) {
+        diagnosis.timestamp = new Date().toISOString();
       }
       
-      localStorage.setItem(DIAGNOSIS_HISTORY_KEY, JSON.stringify(history));
+      localStorage.setItem(DIAGNOSIS_STORAGE_KEY, JSON.stringify(diagnosis));
     } catch (error) {
-      console.error('Error saving diagnosis history:', error);
+      console.error('Error storing diagnosis:', error);
     }
-  };
+  }
   
-  /**
-   * Gets the current diagnosis result
-   */
-  export const getCurrentDiagnosis = (): DiagnosisResult | null => {
+  // Get current diagnosis
+  export function getCurrentDiagnosis(): DiagnosisResult | null {
     try {
-      const data = localStorage.getItem(CURRENT_DIAGNOSIS_KEY);
-      return data ? JSON.parse(data) : null;
+      const data = localStorage.getItem(DIAGNOSIS_STORAGE_KEY);
+      if (!data) return null;
+      
+      return JSON.parse(data) as DiagnosisResult;
     } catch (error) {
-      console.error('Error getting current diagnosis:', error);
+      console.error('Error retrieving diagnosis:', error);
       return null;
     }
-  };
+  }
   
-  /**
-   * Gets the diagnosis history
-   */
-  export const getDiagnosisHistory = (): Array<DiagnosisResult & { timestamp: string }> => {
+  // Reset diagnosis but keep symptoms
+  export function resetDiagnosisKeepSymptoms(): void {
     try {
-      const historyJson = localStorage.getItem(DIAGNOSIS_HISTORY_KEY);
-      return historyJson ? JSON.parse(historyJson) : [];
+      const currentData = getCurrentDiagnosis();
+      if (!currentData) return;
+      
+      // Keep only symptoms, vitals, and reset the rest
+      const resetData: DiagnosisResult = {
+        diagnoses: [],
+        symptoms: currentData.symptoms,
+        vitals: currentData.vitals,
+        labResults: currentData.labResults,
+        medicalHistory: currentData.medicalHistory
+      };
+      
+      storeCurrentDiagnosis(resetData);
     } catch (error) {
-      console.error('Error getting diagnosis history:', error);
-      return [];
+      console.error('Error resetting diagnosis:', error);
     }
-  };
+  }
   
-  /**
-   * Clears the current diagnosis (usually after completing workflow)
-   */
-  export const clearCurrentDiagnosis = (): void => {
-    localStorage.removeItem(CURRENT_DIAGNOSIS_KEY);
-  };
-  
-  /**
-   * Clears all diagnosis data (current and history)
-   */
-  export const clearAllDiagnosisData = (): void => {
-    localStorage.removeItem(CURRENT_DIAGNOSIS_KEY);
-    localStorage.removeItem(DIAGNOSIS_HISTORY_KEY);
-  };
+  // Clear all diagnosis data
+  export function clearDiagnosisData(): void {
+    localStorage.removeItem(DIAGNOSIS_STORAGE_KEY);
+  }

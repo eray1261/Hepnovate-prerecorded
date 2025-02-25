@@ -3,25 +3,17 @@
 import { useEffect, useState } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
-import { AlertTriangle, ThumbsDown, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, ThumbsDown, RefreshCw } from "lucide-react";
 import { useRouter } from 'next/navigation';
-import { storeCurrentDiagnosis, getCurrentDiagnosis } from '@/services/diagnosisStorage';
-
-type Diagnosis = {
-  name: string;
-  confidence: number;
-  findings: string[];
-  differential: string[];
-  plan: string[];
-  severity: 'Mild' | 'Moderate' | 'Severe';
-}
-
-// Enhanced DiagnosisResult type with additional properties
-type DiagnosisResult = {
-  diagnoses: Diagnosis[];
-  imageData?: string;     // Base64 image data
-  symptoms?: string[];    // Patient symptoms
-}
+import { 
+  storeCurrentDiagnosis, 
+  getCurrentDiagnosis, 
+  DiagnosisResult, 
+  Diagnosis, 
+  Vitals, 
+  LabResult, 
+  MedicalHistory 
+} from '@/services/diagnosisStorage';
 
 export default function DiagnosisViewer() {
   const [selectedDiagnoses, setSelectedDiagnoses] = useState<string[]>([]);
@@ -29,8 +21,6 @@ export default function DiagnosisViewer() {
   const [assessment, setAssessment] = useState('');
   const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackText, setFeedbackText] = useState('');
   const [isRequestingNew, setIsRequestingNew] = useState(false);
   const [imageData, setImageData] = useState<string>('');
   const [symptoms, setSymptoms] = useState<string[]>([]);
@@ -97,8 +87,8 @@ export default function DiagnosisViewer() {
 
   // Handle requesting a new diagnosis with feedback
   const handleRequestNewDiagnosis = async () => {
-    if (!feedbackText.trim()) {
-      alert('Please provide feedback before requesting a new diagnosis');
+    if (!assessment.trim()) {
+      alert('Please provide your clinical assessment before requesting an AI review');
       return;
     }
     
@@ -115,7 +105,10 @@ export default function DiagnosisViewer() {
         selectedDiagnoses.includes(d.name)
       );
       
-      // Make API request with feedback
+      // Get stored data from storage service
+      const storedDiagnosis = getCurrentDiagnosis();
+      
+      // Make API request with assessment as primary feedback
       const response = await fetch('/api/diagnose', {
         method: 'POST',
         headers: {
@@ -124,8 +117,11 @@ export default function DiagnosisViewer() {
         body: JSON.stringify({
           imageBase64: imageData,
           symptoms: symptoms,
-          feedback: feedbackText,
-          previousDiagnosis: selectedDiagnosis
+          feedback: assessment,
+          previousDiagnosis: selectedDiagnosis,
+          vitals: storedDiagnosis?.vitals || {},
+          labResults: storedDiagnosis?.labResults || [],
+          medicalHistory: storedDiagnosis?.medicalHistory || {}
         }),
       });
       
@@ -133,13 +129,16 @@ export default function DiagnosisViewer() {
         throw new Error('Failed to get new diagnosis');
       }
       
-      const newDiagnosisData: DiagnosisResult = await response.json();
+      const newDiagnosisData = await response.json();
       
-      // Store the new diagnosis result with image and symptom data
+      // Store the new diagnosis result with all patient data
       const completeData: DiagnosisResult = {
         ...newDiagnosisData,
         imageData,
-        symptoms
+        symptoms,
+        vitals: storedDiagnosis?.vitals,
+        labResults: storedDiagnosis?.labResults,
+        medicalHistory: storedDiagnosis?.medicalHistory
       };
       
       // Save for future use
@@ -152,68 +151,8 @@ export default function DiagnosisViewer() {
       alert('Failed to get new diagnosis. Please try again.');
     } finally {
       setIsRequestingNew(false);
-      setShowFeedback(false);
     }
   };
-
-  // Feedback card component
-  const FeedbackCard = () => (
-    <Card className="border-2 border-red-500 mt-4">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-[#80BCFF]">Diagnosis Feedback</CardTitle>
-          <button 
-            onClick={() => setShowFeedback(false)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        <div className="mb-4">
-          <p className="text-sm text-gray-600 mb-2">
-            Please provide your feedback about what's missing or incorrect in this diagnosis:
-          </p>
-          
-          <textarea
-            value={feedbackText}
-            onChange={(e) => setFeedbackText(e.target.value)}
-            placeholder="This diagnosis needs improvement because..."
-            className="w-full h-28 p-3 border rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-[#80BCFF] text-black placeholder-gray-400"
-          />
-        </div>
-        
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={() => setShowFeedback(false)}
-            className="px-4 py-2 rounded-lg bg-gray-200 text-black font-medium"
-          >
-            Cancel
-          </button>
-          
-          <button
-            onClick={handleRequestNewDiagnosis}
-            disabled={isRequestingNew || !feedbackText.trim()}
-            className="px-4 py-2 rounded-lg bg-blue-500 text-white font-medium flex items-center gap-1 disabled:opacity-50"
-          >
-            {isRequestingNew ? (
-              <>
-                <RefreshCw size={16} className="animate-spin" />
-                Requesting...
-              </>
-            ) : (
-              <>
-                <RefreshCw size={16} />
-                Request New Diagnosis
-              </>
-            )}
-          </button>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   // Loading state
   if (isLoading) {
@@ -368,18 +307,25 @@ export default function DiagnosisViewer() {
                 );
               })}
 
-              {/* Feedback Card (conditional) */}
-              {showFeedback && <FeedbackCard />}
-
               {/* Action Buttons */}
               {selectedDiagnoses.length > 0 && (
                 <div className="flex justify-end gap-4 mt-4">
                   <button 
-                    onClick={() => setShowFeedback(true)}
+                    onClick={handleRequestNewDiagnosis}
+                    disabled={isRequestingNew || !assessment.trim()}
                     className="px-6 py-2 rounded-lg bg-gray-200 text-black font-medium flex items-center gap-2"
                   >
-                    <ThumbsDown size={16} />
-                    Request AI Review
+                    {isRequestingNew ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" />
+                        Requesting...
+                      </>
+                    ) : (
+                      <>
+                        <ThumbsDown size={16} />
+                        Request AI Review
+                      </>
+                    )}
                   </button>
                   <button className="px-6 py-2 rounded-lg bg-green-500 text-white font-medium">
                     Confirm Diagnosis

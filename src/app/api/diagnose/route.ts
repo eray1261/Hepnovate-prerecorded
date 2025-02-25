@@ -22,6 +22,27 @@ interface HuggingFaceResponse {
   generated_text: string;
 }
 
+interface MedicalCondition {
+    condition: string;
+    date: string;
+}
+  
+interface Medication {
+    name: string;
+    dosage: string;
+}
+  
+interface MedicalHistoryData {
+    activeConditions?: MedicalCondition[];
+    currentMedication?: Medication[];
+}
+  
+interface LabResultData {
+    name: string;
+    value: string;
+    unit?: string;
+}
+
 async function parseWithLLM(text: string): Promise<DiagnosisResponse> {
   const parsingPrompt = `<s>[INST] You are a medical data extraction specialist. Parse the following medical analysis into a structured JSON format. Extract only the meaningful medical content, not any template text or placeholders.
 
@@ -143,7 +164,10 @@ export async function POST(request: Request) {
       imageBase64, 
       symptoms = [], 
       feedback = "", 
-      previousDiagnosis = null 
+      previousDiagnosis = null,
+      vitals = {},
+      labResults = [],
+      medicalHistory = {} 
     } = body;
 
     if (!imageBase64) {
@@ -162,6 +186,48 @@ export async function POST(request: Request) {
     // Build the prompt, incorporating feedback if provided
     let prompt = `<|begin_of_text|><|start_header_id|>user<|end_header_id|>
 <|image|>You are a medical AI assistant. Analyze this medical scan image along with the following patient symptoms: ${symptoms.join(', ')}.`;
+
+    // Add vitals if available
+    if (vitals && Object.keys(vitals).length > 0) {
+      const vitalEntries = Object.entries(vitals).filter(([_, value]) => value);
+      if (vitalEntries.length > 0) {
+        const vitalsList = vitalEntries.map(([key, value]) => `${key}: ${value}`).join(', ');
+        prompt += `\n\nPatient vitals: ${vitalsList}`;
+      }
+    }
+
+    // Add lab results if available
+    if (labResults && labResults.length > 0) {
+        const labsList = labResults
+          .map((lab: LabResultData) => `${lab.name}: ${lab.value}${lab.unit ? ' ' + lab.unit : ''}`)
+          .join(', ');
+        if (labsList) {
+          prompt += `\n\nLab results: ${labsList}`;
+        }
+      }
+
+    // Add medical history if available
+    if (medicalHistory) {
+        let historyText = '';
+        
+        if (medicalHistory.activeConditions && medicalHistory.activeConditions.length > 0) {
+          const conditions = medicalHistory.activeConditions
+            .map((c: MedicalCondition) => `${c.condition} (diagnosed: ${c.date})`)
+            .join(', ');
+          historyText += `Active conditions: ${conditions}. `;
+        }
+        
+        if (medicalHistory.currentMedication && medicalHistory.currentMedication.length > 0) {
+          const medications = medicalHistory.currentMedication
+            .map((m: Medication) => `${m.name} ${m.dosage}`)
+            .join(', ');
+          historyText += `Current medications: ${medications}.`;
+        }
+        
+        if (historyText) {
+          prompt += `\n\nMedical history: ${historyText}`;
+        }
+    }
 
     // Add feedback context if provided
     if (feedback) {

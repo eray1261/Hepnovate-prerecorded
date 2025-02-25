@@ -15,7 +15,7 @@ import {
   Save 
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-
+import { storeCurrentDiagnosis, getCurrentDiagnosis } from '@/services/diagnosisStorage';
 interface Point {
   x: number;
   y: number;
@@ -48,19 +48,19 @@ export default function ScanViewer() {
   const handleGenerateDiagnosis = async () => {
     if (!canvasRef.current) return;
     setIsGenerating(true);
-
+  
     try {
       // Create a temporary canvas to combine the image and annotations
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d');
       if (!tempCtx || !imageRef.current) return;
-
+  
       // Reduce the image size
       const MAX_WIDTH = 1024; // Adjust as needed
       const MAX_HEIGHT = 1024;
       let width = canvasRef.current.width;
       let height = canvasRef.current.height;
-
+  
       // Calculate new dimensions while maintaining aspect ratio
       if (width > height) {
           if (width > MAX_WIDTH) {
@@ -73,17 +73,17 @@ export default function ScanViewer() {
               height = MAX_HEIGHT;
           }
       }
-
+  
       tempCanvas.width = width;
       tempCanvas.height = height;
-
+  
       // Draw with reduced dimensions
       tempCtx.drawImage(imageRef.current, 0, 0, width, height);
       tempCtx.drawImage(canvasRef.current, 0, 0, width, height);
-
+  
       // Compress the image more by reducing quality
       const imageData = tempCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
-
+  
       // Get and parse symptoms with better error handling
       const rawSymptoms = searchParams.get('symptoms');
       let symptoms: string[] = [];
@@ -92,7 +92,7 @@ export default function ScanViewer() {
         alert('No symptoms data found. Please return to the previous page and ensure symptoms are recorded.');
         return;
       }
-
+  
       try {
         symptoms = decodeURIComponent(rawSymptoms)
           .split(',')
@@ -103,12 +103,15 @@ export default function ScanViewer() {
         alert('Error processing symptoms data. Please try again.');
         return;
       }
-
+  
       if (symptoms.length === 0) {
         alert('No valid symptoms found. Please ensure symptoms are recorded before generating diagnosis.');
         return;
       }
-
+  
+      // Get existing patient data if available
+      const existingData = getCurrentDiagnosis();
+  
       // Call the diagnosis API
       const response = await fetch('/api/diagnose', {
         method: 'POST',
@@ -118,26 +121,41 @@ export default function ScanViewer() {
         body: JSON.stringify({
           imageBase64: imageData,
           symptoms: symptoms,
-          scanType: selectedScan // Add scan type if needed
+          scanType: selectedScan,
+          // Include any existing patient data
+          vitals: existingData?.vitals || {},
+          labResults: existingData?.labResults || [],
+          medicalHistory: existingData?.medicalHistory || {}
         }),
       });
-
+  
       if (!response.ok) {
         throw new Error(`Failed to generate diagnosis: ${response.statusText}`);
       }
-
+  
       const diagnosisResult = await response.json();
-
-      // Store the diagnosis result with timestamp
-      localStorage.setItem('diagnosisResult', JSON.stringify({
+  
+      // Create a complete result object with all patient data
+      const completeData = {
         ...diagnosisResult,
+        imageData,
         timestamp: new Date().toISOString(),
-        symptoms: symptoms
-      }));
-
+        symptoms,
+        // Preserve existing patient data
+        vitals: existingData?.vitals || {},
+        labResults: existingData?.labResults || [],
+        medicalHistory: existingData?.medicalHistory || {}
+      };
+  
+      // Store the complete diagnosis result using the storage service
+      storeCurrentDiagnosis(completeData);
+      
+      // Legacy support - will be used as fallback in DiagnosisViewer
+      localStorage.setItem('diagnosisResult', JSON.stringify(completeData));
+  
       // Navigate to the diagnosis viewer
       router.push('/diagnosis');
-
+  
     } catch (error) {
       console.error('Error generating diagnosis:', error);
       alert('Failed to generate diagnosis. Please check the console for details and try again.');
