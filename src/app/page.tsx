@@ -586,7 +586,8 @@ export default function Home() {
                       
                       // Convert symptoms array to URL-friendly format
                       const symptomsParam = encodeURIComponent(symptoms.map(s => s.name).join(','));
-                      router.push(`/scan?symptoms=${symptomsParam}`);  // Changed from /scan-viewer to /scan
+                      // Add the patient ID as a query parameter
+                      router.push(`/scan?symptoms=${symptomsParam}&patientId=${selectedPatientId}`);
                     }}
                     className="bg-[#80BCFF] text-white px-8 py-2 rounded-lg flex items-center gap-1"
                   >

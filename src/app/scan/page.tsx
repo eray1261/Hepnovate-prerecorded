@@ -22,9 +22,12 @@ interface Point {
 }
 
 export default function ScanViewer() {
+  const searchParams = useSearchParams();
   const [selectedScan, setSelectedScan] = useState('CT');
   const [scanName, setScanName] = useState('');
-  const [imagePath, setImagePath] = useState('/scans/P1001/CT.png');
+  // Get the patient ID from the URL, fallback to P1001 if not found
+  const patientId = searchParams.get('patientId') || 'P1001';
+  const [imagePath, setImagePath] = useState(`/scans/${patientId}/CT.png`);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -42,9 +45,8 @@ export default function ScanViewer() {
   const textInputRef = useRef<HTMLInputElement>(null);
   const [measurements, setMeasurements] = useState<{ start: Point, end: Point }[]>([]);
   const [isMeasuring, setIsMeasuring] = useState(false);
-  const patientId = 'P1001';
   const [isGenerating, setIsGenerating] = useState(false);
-  const searchParams = useSearchParams();
+  
   const handleGenerateDiagnosis = async () => {
     if (!canvasRef.current) return;
     setIsGenerating(true);
@@ -122,6 +124,7 @@ export default function ScanViewer() {
           imageBase64: imageData,
           symptoms: symptoms,
           scanType: selectedScan,
+          patientId: patientId, // Add patient ID to the request
           // Include any existing patient data
           vitals: existingData?.vitals || {},
           labResults: existingData?.labResults || [],
@@ -141,6 +144,7 @@ export default function ScanViewer() {
         imageData,
         timestamp: new Date().toISOString(),
         symptoms,
+        patientId, // Store patientId in the result
         // Preserve existing patient data
         vitals: existingData?.vitals || {},
         labResults: existingData?.labResults || [],
@@ -511,13 +515,13 @@ if (selectedTool === 'measure') {
               <div className="relative min-h-[600px] bg-black rounded-lg overflow-hidden">
                 {!imageLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center text-white">
-                    Loading {selectedScan} scan...
+                    Loading {selectedScan} scan for Patient {patientId}...
                   </div>
                 )}
                 <img 
                   ref={imageRef}
                   src={imagePath}
-                  alt={`${selectedScan} Scan`}
+                  alt={`${selectedScan} Scan for Patient ${patientId}`}
                   className={`w-full h-full object-contain transition-opacity duration-200 ${
                     imageLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
