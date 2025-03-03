@@ -12,7 +12,8 @@ import {
   Eraser, 
   Undo2, 
   Redo2, 
-  Save 
+  Save,
+  Palette
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { storeCurrentDiagnosis, getCurrentDiagnosis } from '@/services/diagnosisStorage';
@@ -46,6 +47,19 @@ export default function ScanViewer() {
   const [measurements, setMeasurements] = useState<{ start: Point, end: Point }[]>([]);
   const [isMeasuring, setIsMeasuring] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  // Add color selection state
+  const [selectedColor, setSelectedColor] = useState('#FF0000'); // Red default
+  const colorOptions = [
+    '#FF0000', // Red
+    '#00FF00', // Green
+    '#0000FF', // Blue
+    '#FFFF00', // Yellow
+    '#FF00FF', // Magenta
+    '#00FFFF', // Cyan
+    '#FFA500', // Orange
+  ];
+  // Add state to track if color picker is open
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
   const handleGenerateDiagnosis = async () => {
     if (!canvasRef.current) return;
@@ -183,45 +197,66 @@ export default function ScanViewer() {
       if (ctx) {
         canvas.width = imageRef.current.width;
         canvas.height = imageRef.current.height;
-        ctx.strokeStyle = 'red';
+        ctx.strokeStyle = selectedColor;
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
+        
+        // Initialize history with empty canvas
+        if (history.length === 0) {
+          saveToHistory();
+        }
       }
     }
   }, [imageLoaded]);
 
+  // Update stroke color when color changes
+  useEffect(() => {
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.strokeStyle = selectedColor;
+        ctx.fillStyle = selectedColor;
+      }
+    }
+  }, [selectedColor]);
+
   const saveToHistory = () => {
     if (!canvasRef.current) return;
+    
     const newState = canvasRef.current.toDataURL();
+    
+    // If we're not at the end of the history, truncate it
     const newHistory = history.slice(0, historyIndex + 1);
-    setHistory([...newHistory, newState]);
-    setHistoryIndex(newHistory.length);
+    
+    // Add the new state and update the index
+    newHistory.push(newState);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
   };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
       setHistoryIndex(historyIndex - 1);
-      const ctx = canvasRef.current?.getContext('2d');
-      if (ctx && canvasRef.current) {
-        const img = new Image();
-        img.src = history[historyIndex - 1];
-        img.onload = () => {
-          ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
-          ctx.drawImage(img, 0, 0);
-        };
-      }
+      loadCanvasState(historyIndex - 1);
     }
   };
 
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
       setHistoryIndex(historyIndex + 1);
-      const ctx = canvasRef.current?.getContext('2d');
-      if (ctx && canvasRef.current) {
+      loadCanvasState(historyIndex + 1);
+    }
+  };
+
+  const loadCanvasState = (index: number) => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx && canvasRef.current) {
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      
+      if (index >= 0 && index < history.length) {
         const img = new Image();
-        img.src = history[historyIndex + 1];
+        img.src = history[index];
         img.onload = () => {
-          ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
           ctx.drawImage(img, 0, 0);
         };
       }
@@ -235,7 +270,7 @@ export default function ScanViewer() {
     const ctx = canvasRef.current.getContext('2d');
     if (ctx) {
       ctx.font = '16px Arial';
-      ctx.fillStyle = 'red';
+      ctx.fillStyle = selectedColor;
       ctx.fillText(textInput, textPosition.x, textPosition.y);
       saveToHistory();
     }
@@ -301,19 +336,21 @@ export default function ScanViewer() {
     if (ctx) {
       ctx.beginPath();
       ctx.moveTo(x, y);
+      ctx.strokeStyle = selectedColor;
+      ctx.fillStyle = selectedColor;
     }
+    
     if (selectedTool === 'text') {
-  setTextPosition({ x, y });
-  setShowTextInput(true);
-  return;
-}
+      setTextPosition({ x, y });
+      setShowTextInput(true);
+      return;
+    }
 
-if (selectedTool === 'measure') {
-  setIsMeasuring(true);
-  setMeasurements([...measurements, { start: { x, y }, end: { x, y }}]);
-  return;
-}
-
+    if (selectedTool === 'measure') {
+      setIsMeasuring(true);
+      setMeasurements([...measurements, { start: { x, y }, end: { x, y }}]);
+      return;
+    }
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -333,15 +370,12 @@ if (selectedTool === 'measure') {
         ctx.stroke();
         break;
       case 'circle':
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        loadCanvasState(historyIndex);
+        
         const radius = Math.sqrt(
           Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2)
         );
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (historyIndex >= 0) {
-          const img = new Image();
-          img.src = history[historyIndex];
-          ctx.drawImage(img, 0, 0);
-        }
         ctx.beginPath();
         ctx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
         ctx.stroke();
@@ -352,32 +386,28 @@ if (selectedTool === 'measure') {
         ctx.stroke();
         ctx.globalCompositeOperation = 'source-over';
         break;
-
-        case 'measure':
-          if (isMeasuring && startPoint) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (historyIndex >= 0) {
-              const img = new Image();
-              img.src = history[historyIndex];
-              ctx.drawImage(img, 0, 0);
-            }
-            ctx.beginPath();
-            ctx.moveTo(startPoint.x, startPoint.y);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            
-            const distance = Math.sqrt(
-              Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2)
-            );
-            ctx.font = '14px Arial';
-            ctx.fillStyle = 'red';
-            ctx.fillText(
-              `${distance.toFixed(1)}px`,
-              (startPoint.x + x) / 2,
-              (startPoint.y + y) / 2 - 10
-            );
-          }
-          break;
+      case 'measure':
+        if (isMeasuring && startPoint) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          loadCanvasState(historyIndex);
+          
+          ctx.beginPath();
+          ctx.moveTo(startPoint.x, startPoint.y);
+          ctx.lineTo(x, y);
+          ctx.stroke();
+          
+          const distance = Math.sqrt(
+            Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2)
+          );
+          ctx.font = '14px Arial';
+          ctx.fillStyle = selectedColor;
+          ctx.fillText(
+            `${distance.toFixed(1)}px`,
+            (startPoint.x + x) / 2,
+            (startPoint.y + y) / 2 - 10
+          );
+        }
+        break;
     }
   };
 
@@ -441,8 +471,50 @@ if (selectedTool === 'measure') {
                   </div>
                 </div>
 
-                {/* Tool Buttons */}
+                {/* Color Picker Button */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowColorPicker(!showColorPicker)}
+                    className="w-full bg-[#80BCFF] text-black font-bold p-2 rounded-md flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Palette size={18} />
+                      Color
+                    </div>
+                    <div 
+                      className="w-6 h-6 rounded-full border border-gray-300" 
+                      style={{ backgroundColor: selectedColor }}
+                    />
+                  </button>
+                  
+                  {/* Color Picker Dropdown */}
+                  {showColorPicker && (
+                    <div className="absolute z-10 mt-1 p-2 bg-white rounded-md shadow-lg border border-gray-200 w-full">
+                      <div className="grid grid-cols-4 gap-2">
+                        {colorOptions.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => {
+                              setSelectedColor(color);
+                              setShowColorPicker(false);
+                            }}
+                            className="w-8 h-8 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#80BCFF]"
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          />
+                        ))}
+                      </div>
+                      <input
+                        type="color"
+                        value={selectedColor}
+                        onChange={(e) => setSelectedColor(e.target.value)}
+                        className="w-full h-8 mt-2 cursor-pointer"
+                      />
+                    </div>
+                  )}
+                </div>
 
+                {/* Tool Buttons */}
                 <button 
                   onClick={() => handleToolSelect('draw')}
                   className={`w-full ${selectedTool === 'draw' ? 'bg-blue-600' : 'bg-[#80BCFF]'} text-black font-bold p-2 rounded-md flex items-center justify-center gap-2`}
@@ -486,13 +558,19 @@ if (selectedTool === 'measure') {
                 <div className="flex gap-2">
                   <button 
                     onClick={handleUndo}
-                    className="flex-1 bg-[#80BCFF] text-black font-bold p-2 rounded-md flex items-center justify-center"
+                    disabled={historyIndex <= 0}
+                    className={`flex-1 bg-[#80BCFF] text-black font-bold p-2 rounded-md flex items-center justify-center ${
+                      historyIndex <= 0 ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <Undo2 size={18} />
                   </button>
                   <button 
                     onClick={handleRedo}
-                    className="flex-1 bg-[#80BCFF] text-black font-bold p-2 rounded-md flex items-center justify-center"
+                    disabled={historyIndex >= history.length - 1}
+                    className={`flex-1 bg-[#80BCFF] text-black font-bold p-2 rounded-md flex items-center justify-center ${
+                      historyIndex >= history.length - 1 ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <Redo2 size={18} />
                   </button>

@@ -27,6 +27,7 @@ type Vitals = {
 type LabResult = {
   name: string;
   value: string;
+  flag?: string;
   unit: string;
 }
 type MedicalHistory = {
@@ -37,6 +38,20 @@ type MedicalHistory = {
   currentMedication: Array<{
     name: string;
     dosage: string;
+  }>;
+  pastSurgeries: Array<{
+    surgery: string;
+    date: string;
+  }>;
+  allergies: Array<{
+    allergen: string;
+    reaction: string;
+  }>;
+  socialHistory: string;
+  familyHistory: string;
+  immunizations: Array<{
+    immunization: string;
+    date: string;
   }>;
 }
 type PatientRecord = {
@@ -61,9 +76,39 @@ export default function Home() {
   const [medicalHistory, setMedicalHistory] = useState<MedicalHistory>({
     activeConditions: [],
     currentMedication: [],
+    pastSurgeries: [],
+    allergies: [],
+    socialHistory: "",
+    familyHistory: "",
+    immunizations: []
   })
+  const [labTestDate, setLabTestDate] = useState<string>("")
   const [websocketConnected, setWebsocketConnected] = useState(false)
+  const labUnitMapping: { [key: string]: string } = {
+    "ALT": "U/L",
+    "AST": "U/L",
+    "ALP": "U/L",
+    "Albumin": "g/dL",
+    "Total Protein": "g/dL",
+    "Bilirubin": "mg/dL",
+    "GGT": "U/L",
+    "LD": "U/L",
+    "PT": "sec",
+    "INR": "",
+    "Platelets": "K/μL",
+    "WBC": "K/μL",
+    "Hemoglobin": "g/dL",
+    "Hematocrit": "%",
+    "Creatinine": "mg/dL",
+    "BUN": "mg/dL",
+    "Sodium": "mEq/L",
+    "Potassium": "mEq/L",
+    "Chloride": "mEq/L",
+    "Bicarbonate": "mEq/L",
+    "Glucose": "mg/dL"
+  }
   const records: PatientRecord[] = [];
+
 
   // Load saved data from localStorage on initial render
   useEffect(() => {
@@ -155,47 +200,91 @@ export default function Home() {
   useEffect(() => {
     const loadCSVData = async () => {
         try {
-            // Load Lab Results - keep this part the same
-            const labResultsResponse = await fetch('/data/lab_results.csv');
-            if (!labResultsResponse.ok) {
-                console.error("Failed to load lab results:", labResultsResponse.status);
-                return;
+            // Load Lab Results with debugging
+            // Load Lab Results with debugging
+      const labResultsResponse = await fetch('/data/lab_results.csv');
+      if (!labResultsResponse.ok) {
+        console.error("Failed to load lab results:", labResultsResponse.status);
+        return;
+      }
+      const labResultsCSV = await labResultsResponse.text();
+      
+      // Log the raw CSV data
+      console.log("Raw CSV data:", labResultsCSV.substring(0, 200) + "...");
+
+      parse(labResultsCSV, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      }, (err, records: Array<{ [key: string]: string }>) => {
+        if (err) {
+          console.error("Lab Results parsing error:", err);
+          return;
+        }
+        
+        // Log all parsed records
+        console.log("All parsed records:", records);
+
+        // Extract all unique patient IDs
+        const uniquePatientIds = [...new Set(records.map(record => record['Patient ID']))];
+        if (uniquePatientIds.length > 0) {
+          setPatientIds(uniquePatientIds);
+        }
+
+        const selectedPatientData = records.find(patient => patient['Patient ID'] === selectedPatientId);
+        console.log("Selected patient data:", selectedPatientData);
+
+        if (selectedPatientData) {
+          // Save test date if available
+          if (selectedPatientData['Test Date']) {
+            setLabTestDate(selectedPatientData['Test Date']);
+          }
+
+          // Process all lab results, extracting values and flags
+          const patientLabResults: LabResult[] = [];
+          
+          // Get all columns first
+          const allColumns = Object.keys(selectedPatientData);
+          console.log("All columns:", allColumns);
+          
+          // Process each lab test column (those that don't end with 'Flag' and aren't Patient ID or Test Date)
+          for (const column of allColumns) {
+            if (column === 'Patient ID' || column === 'Test Date' || column.endsWith(' Flag')) {
+              continue;
             }
-            const labResultsCSV = await labResultsResponse.text();
-
-            parse(labResultsCSV, {
-                columns: true,
-                skip_empty_lines: true,
-                trim: true,
-            }, (err, records: Array<{ [key: string]: string }>) => {
-                if (err) {
-                    console.error("Lab Results parsing error:", err);
-                    return;
-                }
-
-                // Extract all unique patient IDs
-                const uniquePatientIds = [...new Set(records.map(record => record['Patient ID']))];
-                if (uniquePatientIds.length > 0) {
-                    setPatientIds(uniquePatientIds);
-                }
-
-                const selectedPatientData = records.find(patient => patient['Patient ID'] === selectedPatientId);
-
-                if (selectedPatientData) {
-                    const patientLabResults: LabResult[] = Object.entries(selectedPatientData)
-                        .filter(([key]) => key !== 'Patient ID')
-                        .map(([name, value]) => ({ 
-                            name, 
-                            value: String(value).trim(), 
-                            unit: '' 
-                        }));
-
-                    setLabResults(patientLabResults);
-                } else {
-                    console.log("Patient data not found for ID:", selectedPatientId);
-                    setLabResults([]);
-                }
+            
+            // Get the value for this test
+            const value = selectedPatientData[column];
+            
+            // Find the corresponding flag column and value
+            const flagColumn = `${column} Flag`;
+            const flag = selectedPatientData[flagColumn] || "";
+            
+            // Get the unit from our mapping
+            const unit = labUnitMapping[column] || "";
+            
+            console.log(`Processing column: ${column}, value: ${value}, flag: ${flag}, unit: ${unit}`);
+            
+            // Create the lab result object
+            patientLabResults.push({
+              name: column,
+              value: String(value || "").trim(),
+              flag: String(flag || "").trim(),
+              unit: unit
             });
+          }
+          
+          // Debug the final processed results
+          console.log("Processed lab results:", patientLabResults);
+          
+          // Set the lab results (the full array)
+          setLabResults(patientLabResults);
+            
+        } else {
+          console.log("Patient data not found for ID:", selectedPatientId);
+          setLabResults([]);
+        }
+      });
 
             // Load Medical History - updated parsing logic
             const medicalHistoryResponse = await fetch('/data/medical_history.csv');
@@ -213,6 +302,14 @@ export default function Home() {
                 'Patient ID': string;
                 'Active Conditions': string;
                 'Current Medications': string;
+                'Past Surgeries': string;
+                'Surgery Dates': string;
+                'Allergies': string;
+                'Reactions': string;
+                'Social History': string;
+                'Family History': string;
+                'Immunizations': string;
+                'Immunization Dates': string;
             }>) => {
                 if (err) {
                     console.error("Medical History parsing error:", err);
@@ -222,7 +319,7 @@ export default function Home() {
                 const selectedPatientData = records.find(record => record['Patient ID'] === selectedPatientId);
 
                 if (selectedPatientData) {
-                    // Parse Active Conditions
+                    // Parse Active Conditions (existing code)
                     const conditionsStr = selectedPatientData['Active Conditions']
                         .replace(/^\[|\]$/g, '') // Remove outer brackets
                         .replace(/['"]/g, '');    // Remove quotes
@@ -237,7 +334,7 @@ export default function Home() {
                         };
                     });
 
-                    // Parse Current Medications
+                    // Parse Current Medications (existing code)
                     const medicationsStr = selectedPatientData['Current Medications']
                         .replace(/^\[|\]$/g, '') // Remove outer brackets
                         .replace(/['"]/g, '');    // Remove quotes
@@ -252,15 +349,76 @@ export default function Home() {
                         };
                     });
 
+                    // Parse Past Surgeries (new)
+                    const surgeriesStr = selectedPatientData['Past Surgeries']
+                        .replace(/^\[|\]$/g, '') // Remove outer brackets
+                        .replace(/['"]/g, '');    // Remove quotes
+                    
+                    const surgeryDatesStr = selectedPatientData['Surgery Dates']
+                        .replace(/^\[|\]$/g, '') // Remove outer brackets
+                        .replace(/['"]/g, '');    // Remove quotes
+                        
+                    const surgeries = surgeriesStr.split(', ').map((surgery, index) => {
+                        const dates = surgeryDatesStr.split(', ');
+                        return {
+                            surgery: surgery,
+                            date: dates[index] || ''
+                        };
+                    });
+
+                    // Parse Allergies (new)
+                    const allergiesStr = selectedPatientData['Allergies']
+                        .replace(/^\[|\]$/g, '') // Remove outer brackets
+                        .replace(/['"]/g, '');    // Remove quotes
+                        
+                    const reactionsStr = selectedPatientData['Reactions']
+                        .replace(/^\[|\]$/g, '') // Remove outer brackets
+                        .replace(/['"]/g, '');    // Remove quotes
+                        
+                    const allergies = allergiesStr.split(', ').map((allergen, index) => {
+                        const reactions = reactionsStr.split(', ');
+                        return {
+                            allergen: allergen,
+                            reaction: reactions[index] || ''
+                        };
+                    });
+
+                    // Parse Immunizations (new)
+                    const immunizationsStr = selectedPatientData['Immunizations']
+                        .replace(/^\[|\]$/g, '') // Remove outer brackets
+                        .replace(/['"]/g, '');    // Remove quotes
+                        
+                    const immunizationDatesStr = selectedPatientData['Immunization Dates']
+                        .replace(/^\[|\]$/g, '') // Remove outer brackets
+                        .replace(/['"]/g, '');    // Remove quotes
+                        
+                    const immunizations = immunizationsStr.split(', ').map((immunization, index) => {
+                        const dates = immunizationDatesStr.split(', ');
+                        return {
+                            immunization: immunization,
+                            date: dates[index] || ''
+                        };
+                    });
+
                     setMedicalHistory({
                         activeConditions: conditions,
-                        currentMedication: medications
+                        currentMedication: medications,
+                        pastSurgeries: surgeries,
+                        allergies: allergies,
+                        socialHistory: selectedPatientData['Social History'] || '',
+                        familyHistory: selectedPatientData['Family History'] || '',
+                        immunizations: immunizations
                     });
                 } else {
                     console.log("Patient data not found for ID:", selectedPatientId);
                     setMedicalHistory({
                         activeConditions: [],
-                        currentMedication: []
+                        currentMedication: [],
+                        pastSurgeries: [],
+                        allergies: [],
+                        socialHistory: "",
+                        familyHistory: "",
+                        immunizations: []
                     });
                 }
             });
@@ -411,6 +569,24 @@ export default function Home() {
     }
   };
 
+  // Helper function to get the color for lab result flags
+  const getFlagColor = (flag: string): string => {
+    switch (flag.toLowerCase()) {
+      case 'high':
+        return 'text-red-600';
+      case 'low':
+        return 'text-blue-600';
+      default:
+        return 'text-gray-500';
+    }
+  };
+
+  const abnormalLabResults = labResults.filter(lab => {
+    // Make sure flag exists and normalize it
+    const flag = lab.flag ? lab.flag.toLowerCase().trim() : '';
+    return flag === 'high' || flag === 'low';
+  });
+
   return (
     <main className="min-h-screen bg-white flex flex-col">
       <Header />
@@ -522,30 +698,52 @@ export default function Home() {
               <Card className="w-full">
                 <div className="m-4 p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Lab Results */}
+                    {/* Lab Results - Show abnormal results with improved display */}
                     <div>
-                      <CardTitle className="text-[#80BCFF] mb-4">Recent Lab Results</CardTitle>
+                      <CardTitle className="text-[#80BCFF] mb-2">Abnormal Lab Results</CardTitle>
+                      {labTestDate && (
+                        <div className="text-sm text-gray-500 mb-2">Test Date: {labTestDate}</div>
+                      )}
+                      
                       <div className="space-y-2 text-black max-h-[300px] overflow-y-auto pr-2">
-                        {labResults && labResults.length > 0 ? (
-                          labResults.map((item, index) => (
-                            <div key={index} className="flex justify-between items-center">
-                              <span className="text-sm">{item.name}</span>
-                              <input
-                                type="text"
-                                value={item.value}
-                                placeholder={item.unit}
-                                className="w-24 px-2 py-1 text-sm border rounded-md text-right bg-gray-50 text-gray-500"
-                                readOnly
-                              />
-                            </div>
-                          ))
+                        {abnormalLabResults.length > 0 ? (
+                          abnormalLabResults.map((item, index) => {
+                            console.log(`Rendering item ${index}:`, item);
+                            return (
+                              <div key={index} className="flex justify-between items-center mb-1 py-1 border-b">
+                                <span className="text-sm font-medium">{item.name}</span>
+                                <div className="flex items-center">
+                                  <span className={`text-sm mr-2 ${getFlagColor(item.flag || '')}`}>
+                                    {item.value}{item.unit ? ` ${item.unit}` : ''}
+                                  </span>
+                                  <span 
+                                    className={`text-xs px-1.5 py-0.5 rounded ${
+                                      item.flag?.toLowerCase().trim() === 'high' 
+                                        ? 'bg-red-100 text-red-800' 
+                                        : 'bg-blue-100 text-blue-800'
+                                    }`}
+                                  >
+                                    {item.flag}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
                         ) : (
-                          <div>Loading lab results...</div>
+                          <div>No abnormal lab results detected ({labResults.length} total lab results available)</div>
                         )}
                       </div>
+                      
+                      {/* More informative count of normal labs */}
+                      {labResults.length > 0 && (
+                        <div className="text-xs text-gray-500 mt-2">
+                          {labResults.length - abnormalLabResults.length} normal lab results not shown
+                          (Debug: {abnormalLabResults.length} abnormal results showing)
+                        </div>
+                      )}
                     </div>
 
-                    {/* Medical History */}
+                    {/* Medical History - Keeping only active conditions and medications in the UI */}
                     <div>
                       <CardTitle className="text-[#80BCFF] mb-4">Medical History</CardTitle>
                       <div className="max-h-[300px] overflow-y-auto pr-2">
@@ -574,25 +772,28 @@ export default function Home() {
 
                   {/* Next Button */}
                   <div className="flex justify-end mt-8">
-                  <button 
-                    onClick={() => {
-                      // Store current symptoms and vitals before navigation
-                      const currentData: DiagnosisResult = {
-                        diagnoses: [],
-                        symptoms: symptoms.map(s => s.name),
-                        vitals: vitals
-                      };
-                      storeCurrentDiagnosis(currentData);
-                      
-                      // Convert symptoms array to URL-friendly format
-                      const symptomsParam = encodeURIComponent(symptoms.map(s => s.name).join(','));
-                      // Add the patient ID as a query parameter
-                      router.push(`/scan?symptoms=${symptomsParam}&patientId=${selectedPatientId}`);
-                    }}
-                    className="bg-[#80BCFF] text-white px-8 py-2 rounded-lg flex items-center gap-1"
-                  >
-                    Next <span className="text-lg">→</span>
-                  </button>
+                    <button 
+                      onClick={() => {
+                        // Store ALL medical data for diagnosis, including all lab results
+                        const currentData: DiagnosisResult = {
+                          diagnoses: [],
+                          symptoms: symptoms.map(s => s.name),
+                          vitals: vitals,
+                          medicalHistory: medicalHistory,  // Store the full medical history
+                          labResults: labResults,          // Store ALL lab results, not just abnormal ones
+                          labTestDate: labTestDate         // Store test date
+                        };
+                        storeCurrentDiagnosis(currentData);
+                        
+                        // Convert symptoms array to URL-friendly format
+                        const symptomsParam = encodeURIComponent(symptoms.map(s => s.name).join(','));
+                        // Add the patient ID as a query parameter
+                        router.push(`/scan?symptoms=${symptomsParam}&patientId=${selectedPatientId}`);
+                      }}
+                      className="bg-[#80BCFF] text-white px-8 py-2 rounded-lg flex items-center gap-1"
+                    >
+                      Next <span className="text-lg">→</span>
+                    </button>
                   </div>
                 </div>
               </Card>

@@ -1,11 +1,11 @@
-Patient ID,ALT (U/L),AST (U/L),ALP (U/L),Albumin (g/dL),Total Protein (g/dL),Bilirubin (mg/dL),GGT (U/L),LD (U/L),PT (sec)
-P1000,13,63,137,3.28,6.59,1.33,76,208,10.38
-P1001,67,47,107,4.39,6.43,1.03,75,235,12.32
-P1002,40,20,128,3.19,7.85,0.16,45,112,11.9
-P1003,24,51,144,3.42,7.67,0.94,55,159,12.74
-P1004,55,40,97,4.35,6.19,1.31,23,153,13.25
-P1005,71,64,57,4.95,5.94,0.18,14,134,10.01
-P1006,72,53,68,4.51,7.49,1.05,30,176,9.97
-P1007,40,46,75,4.54,6.53,0.33,11,235,13.52
-P1008,50,70,107,3.25,5.69,0.83,25,130,9.74
-P1009,75,11,34,4.13,6.66,0.47,53,165,12.48
+Patient ID,Test Date,ALT,ALT Flag,AST,AST Flag,ALP,ALP Flag,Albumin,Albumin Flag,Total Protein,Total Protein Flag,Bilirubin,Bilirubin Flag,GGT,GGT Flag,LD,LD Flag,PT,PT Flag,INR,INR Flag,Platelets,Platelets Flag,WBC,WBC Flag,Hemoglobin,Hemoglobin Flag,Hematocrit,Hematocrit Flag,Creatinine,Creatinine Flag,BUN,BUN Flag,Sodium,Sodium Flag,Potassium,Potassium Flag,Chloride,Chloride Flag,Bicarbonate,Bicarbonate Flag,Glucose,Glucose Flag
+P1000,2025-02-15,78,High,85,High,137,High,3.28,Low,6.59,Normal,1.33,High,76,High,208,Normal,10.38,Normal,0.96,Normal,185,Normal,6.7,Normal,13.4,Normal,39.8,Normal,0.82,Normal,15,Normal,138,Normal,4.2,Normal,102,Normal,24,Normal,96,Normal
+P1001,2025-02-16,42,Normal,47,Normal,107,Normal,3.6,Normal,6.43,Normal,1.53,High,75,High,235,High,14.5,High,1.35,High,95,Low,5.8,Normal,12.8,Low,37.2,Low,0.94,Normal,17,Normal,135,Low,4.6,Normal,100,Normal,22,Low,105,Normal
+P1002,2025-02-14,40,Normal,45,Normal,128,High,3.5,Normal,7.4,Normal,1.16,Normal,70,High,156,Normal,13.8,High,1.28,High,88,Low,7.2,Normal,14.1,Normal,41.5,Normal,1.08,Normal,19,Normal,140,Normal,3.9,Normal,104,Normal,25,Normal,110,Normal
+P1003,2025-02-17,65,High,87,High,144,High,3.0,Low,7.67,High,1.94,High,125,High,159,Normal,14.2,High,1.38,High,78,Low,8.9,Normal,11.2,Low,33.6,Low,1.21,High,22,Normal,133,Low,5.0,High,99,Low,21,Low,92,Normal
+P1004,2025-02-12,86,High,95,High,145,High,3.2,Low,6.19,Normal,1.75,High,135,High,153,Normal,13.25,High,1.23,High,92,Low,6.4,Normal,13.5,Normal,40.2,Normal,0.88,Normal,16,Normal,139,Normal,4.3,Normal,101,Normal,23,Normal,98,Normal
+P1005,2025-02-15,62,High,77,High,137,High,3.1,Low,5.94,Low,1.8,High,125,High,145,Normal,13.8,High,1.32,High,85,Low,5.2,Normal,13.2,Normal,39.5,Normal,0.76,Normal,14,Normal,138,Normal,4.0,Normal,103,Normal,26,Normal,88,Normal
+P1006,2025-02-16,86,High,92,High,112,Normal,3.8,Normal,7.49,High,1.05,Normal,85,High,176,Normal,9.97,Normal,0.92,Normal,178,Normal,7.8,Normal,12.9,Normal,38.4,Normal,0.91,Normal,18,Normal,137,Normal,4.5,Normal,100,Normal,24,Normal,115,Normal
+P1007,2025-02-13,95,High,90,High,124,High,3.4,Low,6.53,Normal,1.45,High,95,High,235,High,13.52,High,1.25,High,110,Low,9.1,High,10.8,Low,32.1,Low,1.35,High,26,High,132,Low,5.2,High,97,Low,20,Low,128,High
+P1008,2025-02-14,58,High,70,High,107,Normal,3.5,Normal,5.69,Low,1.2,Normal,88,High,130,Normal,12.5,Normal,1.15,High,145,Normal,6.1,Normal,13.7,Normal,40.8,Normal,0.85,Normal,17,Normal,140,Normal,4.1,Normal,102,Normal,25,Normal,94,Normal
+P1009,2025-02-17,60,High,72,High,134,High,3.2,Low,6.66,Normal,1.6,High,95,High,165,Normal,12.8,Normal,1.18,High,130,Low,7.5,Normal,12.3,Low,36.5,Low,1.05,Normal,20,Normal,136,Normal,4.4,Normal,101,Normal,22,Low,108,Normal

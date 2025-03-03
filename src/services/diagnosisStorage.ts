@@ -12,6 +12,7 @@ export type Vitals = {
     name: string;
     value: string;
     unit: string;
+    flag?: string;  // Add flag field for abnormal values
   };
   
   export type MedicalCondition = {
@@ -24,9 +25,30 @@ export type Vitals = {
     dosage: string;
   };
   
+  export type Surgery = {
+    surgery: string;
+    date: string;
+  };
+  
+  export type Allergy = {
+    allergen: string;
+    reaction: string;
+  };
+  
+  export type Immunization = {
+    immunization: string;
+    date: string;
+  };
+  
+  // Expanded MedicalHistory type
   export type MedicalHistory = {
     activeConditions: MedicalCondition[];
     currentMedication: Medication[];
+    pastSurgeries?: Surgery[];
+    allergies?: Allergy[];
+    socialHistory?: string;
+    familyHistory?: string;
+    immunizations?: Immunization[];
   };
   
   export type Diagnosis = {
@@ -45,8 +67,10 @@ export type Vitals = {
     symptoms?: string[];    // Patient symptoms
     vitals?: Vitals;        // Patient vitals
     labResults?: LabResult[]; // Laboratory results
+    labTestDate?: string;   // Date of lab tests
     medicalHistory?: MedicalHistory; // Medical history
     timestamp?: string;     // When diagnosis was created
+    rawDiagnosisText?: string; // Raw text from diagnosis model
   };
   
   // Local storage key
@@ -91,6 +115,7 @@ export type Vitals = {
         symptoms: currentData.symptoms,
         vitals: currentData.vitals,
         labResults: currentData.labResults,
+        labTestDate: currentData.labTestDate,
         medicalHistory: currentData.medicalHistory
       };
       
