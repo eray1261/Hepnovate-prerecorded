@@ -1,4 +1,4 @@
-// Enhanced DiagnosisStorage Service to include all patient data
+// src/services/diagnosisStorage.ts
 
 // Define interfaces
 export type Vitals = {
@@ -73,8 +73,18 @@ export type Vitals = {
     rawDiagnosisText?: string; // Raw text from diagnosis model
   };
   
-  // Local storage key
+  /**
+   * Interface for medical write-up data
+   */
+  export interface WriteUpData {
+    content: string;
+    createdAt: string;
+    diagnosisId?: string; // Reference to the associated diagnosis
+  }
+  
+  // Local storage keys
   const DIAGNOSIS_STORAGE_KEY = 'currentDiagnosis';
+  const WRITEUP_STORAGE_KEY = 'currentWriteUp';
   
   // Store current diagnosis
   export function storeCurrentDiagnosis(diagnosis: DiagnosisResult): void {
@@ -128,4 +138,41 @@ export type Vitals = {
   // Clear all diagnosis data
   export function clearDiagnosisData(): void {
     localStorage.removeItem(DIAGNOSIS_STORAGE_KEY);
+  }
+  
+  /**
+   * Store the generated write-up content in localStorage
+   */
+  export function storeWriteUp(writeUp: string, diagnosisId?: string): void {
+    try {
+      const writeUpData: WriteUpData = {
+        content: writeUp,
+        createdAt: new Date().toISOString(),
+        diagnosisId
+      };
+      
+      localStorage.setItem(WRITEUP_STORAGE_KEY, JSON.stringify(writeUpData));
+    } catch (error) {
+      console.error('Error storing write-up data:', error);
+    }
+  }
+  
+  /**
+   * Retrieve the current write-up from localStorage
+   */
+  export function getCurrentWriteUp(): WriteUpData | null {
+    try {
+      const writeUpData = localStorage.getItem(WRITEUP_STORAGE_KEY);
+      return writeUpData ? JSON.parse(writeUpData) : null;
+    } catch (error) {
+      console.error('Error retrieving write-up data:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Clear the write-up data
+   */
+  export function clearWriteUpData(): void {
+    localStorage.removeItem(WRITEUP_STORAGE_KEY);
   }

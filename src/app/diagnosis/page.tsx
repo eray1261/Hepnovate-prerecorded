@@ -84,6 +84,19 @@ export default function DiagnosisViewer() {
 
     loadDiagnosis();
   }, [router]);
+  
+  // Handle confirm diagnosis and navigate to write-up page
+  const handleConfirmDiagnosis = () => {
+    console.log("✅ Confirm Diagnosis button clicked!"); // Debugging log
+    console.log("Assessment:", assessment);
+    
+    if (assessment && assessment.trim()) {
+      localStorage.setItem('physicianAssessment', assessment);
+    }
+  
+    router.push('/writeup'); // Try navigating
+  };
+  
 
   // Handle requesting a new diagnosis with feedback
   const handleRequestNewDiagnosis = async () => {
@@ -327,7 +340,10 @@ export default function DiagnosisViewer() {
                       </>
                     )}
                   </button>
-                  <button className="px-6 py-2 rounded-lg bg-green-500 text-white font-medium">
+                  <button 
+                    onClick={handleConfirmDiagnosis}
+                    className="px-6 py-2 rounded-lg bg-green-500 text-white font-medium"
+                  >
                     Confirm Diagnosis
                   </button>
                 </div>
