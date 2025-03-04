@@ -200,7 +200,7 @@ export async function POST(request: Request) {
       previousDiagnosis = null,
       vitals = {},
       labResults = [],
-      medicalHistory = {} 
+      medicalHistory = {} as MedicalHistoryData
     } = body;
 
     if (!imageBase64) {

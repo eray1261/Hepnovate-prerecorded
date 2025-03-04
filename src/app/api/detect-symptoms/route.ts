@@ -53,7 +53,7 @@ Important rules:
     });
 
     let detectedSymptoms: string[] = [];
-    let vitals: { temperature: string | null; bloodPressure: string | null; pulse: string | null } = {
+    const vitals: { temperature: string | null; bloodPressure: string | null; pulse: string | null } = {
       temperature: null,
       bloodPressure: null,
       pulse: null,
