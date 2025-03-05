@@ -7,6 +7,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
+
+// ✅ Fix CSP Issue: Allow WebSocket Connections
+app.use((_req, res, next) => {
+  res.setHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self' wss://your-websocket-server.onrender.com");
+  next();
+});
+
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
@@ -76,7 +83,6 @@ wss.on('connection', (ws) => {
     deepgram?.removeAllListeners();
     deepgram = undefined;
 
-    // Ensure the WebSocket connection is properly closed
     if (ws.readyState !== WebSocket.CLOSED) {
       ws.terminate();
     }
