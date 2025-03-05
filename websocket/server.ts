@@ -8,10 +8,9 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Explicitly set CSP headers using Render's environment variable
+// ✅ Fix: Set CSP Headers Correctly for WebSockets
 app.use((_req, res, next) => {
-  const cspDirectives = process.env.CSP_DIRECTIVES || "default-src 'self'; connect-src 'self' wss://your-websocket-server.onrender.com";
-  res.setHeader("Content-Security-Policy", cspDirectives);
+  res.setHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self' ws: wss:;");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -19,7 +18,7 @@ app.use((_req, res, next) => {
 });
 
 // ✅ Debug: Print CSP Directives in Logs
-console.log("🔍 CSP Directives from Render:", process.env.CSP_DIRECTIVES);
+console.log("🔍 Applying CSP Headers: default-src 'self'; connect-src 'self' ws: wss:;");
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
