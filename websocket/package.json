@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "server": "tsx server.ts", 
-    "build": "next build && tsc",
-    "start": "node dist/server.js",
+    "server": "tsx server.ts",
+    "build": "next build",
+    "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
