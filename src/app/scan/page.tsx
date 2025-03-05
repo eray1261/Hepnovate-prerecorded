@@ -65,7 +65,7 @@ function ScanViewerContent() {
   ];
   // Add state to track if color picker is open
   const [showColorPicker, setShowColorPicker] = useState(false);
-  // Add ref to store current paths
+  // Add a simpler version of path tracking, just to maintain the interface
   const pathsRef = useRef<PathData[]>([]);
   
   const saveToHistory = () => {
@@ -342,11 +342,16 @@ function ScanViewerContent() {
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Start a new path
-      ctx.beginPath();
-      ctx.moveTo(x, y);
       ctx.strokeStyle = selectedColor;
       ctx.fillStyle = selectedColor;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      
+      // For all tools except text and measure, start a path
+      if (selectedTool !== 'text' && selectedTool !== 'measure') {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
       
       // For the draw tool, create a new drawing path
       if (selectedTool === 'draw') {
@@ -385,15 +390,12 @@ function ScanViewerContent() {
 
     switch (selectedTool) {
       case 'draw':
-        // Continue the current path
+        // Let's fix the drawing problem by NOT creating a new path here
+        // Just continue the current path
         ctx.lineTo(x, y);
         ctx.stroke();
         
-        // Important: Create a new path segment to avoid connecting back
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        
-        // Add this point to the current path
+        // Add this point to the current path data
         if (pathsRef.current.length > 0) {
           const currentPath = pathsRef.current[pathsRef.current.length - 1];
           currentPath.points.push({x, y});
@@ -416,11 +418,6 @@ function ScanViewerContent() {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineTo(x, y);
         ctx.stroke();
-        
-        // Important: Create a new path segment
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        
         ctx.globalCompositeOperation = 'source-over';
         break;
         
@@ -452,55 +449,18 @@ function ScanViewerContent() {
   const stopDrawing = () => {
     if (!isDrawing || !canvasRef.current) return;
     
-    const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      ctx.closePath(); // Close the current drawing path properly
-      
-      if (selectedTool === 'draw') {
-        // Finalize the path by redrawing it
-        redrawPaths();
-      }
+    if (selectedTool === 'draw') {
+      // Don't do anything special for drawing, just save to history
+    } else if (selectedTool === 'circle' || selectedTool === 'measure') {
+      // For tools that clear and redraw, we need to finalize them
     }
     
     setIsDrawing(false);
     saveToHistory();
   };
   
-  // Function to redraw all paths (useful to ensure drawing persists)
-  const redrawPaths = () => {
-    if (!canvasRef.current) return;
-    
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-    
-    // Temporarily store current settings
-    const currentStrokeStyle = ctx.strokeStyle;
-    const currentLineWidth = ctx.lineWidth;
-    const currentLineCap = ctx.lineCap;
-    
-    // Redraw each path
-    pathsRef.current.forEach(path => {
-      if (path.tool === 'draw' && path.points.length > 0) {
-        ctx.beginPath();
-        ctx.strokeStyle = path.color;
-        ctx.moveTo(path.points[0].x, path.points[0].y);
-        
-        for (let i = 1; i < path.points.length; i++) {
-          ctx.lineTo(path.points[i].x, path.points[i].y);
-          ctx.stroke();
-          
-          // Start a new segment for each point to prevent connecting lines oddly
-          ctx.beginPath();
-          ctx.moveTo(path.points[i].x, path.points[i].y);
-        }
-      }
-    });
-    
-    // Restore original settings
-    ctx.strokeStyle = currentStrokeStyle;
-    ctx.lineWidth = currentLineWidth;
-    ctx.lineCap = currentLineCap;
-  };
+  // We'll keep a simpler approach for now, removing the redrawPaths function
+  // If needed later, we can add it back
 
   const handleToolSelect = (tool: string) => {
     setSelectedTool(tool);
