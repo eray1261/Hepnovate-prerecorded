@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation"
 import { parse } from "csv-parse"
 import { 
   getCurrentDiagnosis, 
-  resetDiagnosisKeepSymptoms, 
   storeCurrentDiagnosis,
   DiagnosisResult
 } from "@/services/diagnosisStorage";
@@ -107,7 +106,6 @@ export default function Home() {
     "Bicarbonate": "mEq/L",
     "Glucose": "mg/dL"
   }
-  const records: PatientRecord[] = [];
 
 
   // Load saved data from localStorage on initial render
@@ -429,7 +427,7 @@ export default function Home() {
     };
 
     loadCSVData();
-}, [selectedPatientId]);
+  }, [selectedPatientId, labUnitMapping]);
 
   const startRecording = async () => {
     try {

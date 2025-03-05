@@ -1,5 +1,3 @@
-// /Users/eshanikaray/hepnovate/src/app/api/diagnose/route.ts
-
 import { NextResponse } from 'next/server';
 import { HfInference } from '@huggingface/inference';
 
@@ -32,6 +30,7 @@ interface Medication {
     dosage: string;
 }
   
+// This type is used in the POST handler for medical history
 interface MedicalHistoryData {
     activeConditions?: MedicalCondition[];
     currentMedication?: Medication[];
@@ -224,14 +223,14 @@ Return only the JSON, with no additional text before or after. [/INST]</s>`;
     }
 
     // Validate and clean each diagnosis
-    const validatedDiagnoses = parsedJson.diagnoses.map((diag: any) => {
+    const validatedDiagnoses = parsedJson.diagnoses.map((diag: Record<string, unknown>) => {
       return {
         name: diag.name || 'Unspecified Condition',
         confidence: typeof diag.confidence === 'number' ? Math.min(Math.max(diag.confidence, 0), 100) : 75,
         findings: Array.isArray(diag.findings) ? diag.findings : [],
         differential: Array.isArray(diag.differential) ? diag.differential : [],
         plan: Array.isArray(diag.plan) ? diag.plan : [],
-        severity: ['Mild', 'Moderate', 'Severe'].includes(diag.severity) 
+        severity: ['Mild', 'Moderate', 'Severe'].includes(diag.severity as string) 
           ? diag.severity as 'Mild' | 'Moderate' | 'Severe'
           : 'Moderate'
       };

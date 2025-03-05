@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardHeader, CardTitle } from "@/components/card";
-import { 
-  Move, 
+import {  
   Pencil, 
   Circle, 
   Ruler, 
@@ -35,8 +34,6 @@ export default function ScanViewer() {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
-  const [isPanning, setIsPanning] = useState(false);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
@@ -60,7 +57,20 @@ export default function ScanViewer() {
   ];
   // Add state to track if color picker is open
   const [showColorPicker, setShowColorPicker] = useState(false);
-  
+  const saveToHistory = () => {
+    if (!canvasRef.current) return;
+    
+    const newState = canvasRef.current.toDataURL();
+    
+    // If we're not at the end of the history, truncate it
+    const newHistory = history.slice(0, historyIndex + 1);
+    
+    // Add the new state and update the index
+    newHistory.push(newState);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
   const handleGenerateDiagnosis = async () => {
     if (!canvasRef.current) return;
     setIsGenerating(true);
@@ -207,7 +217,7 @@ export default function ScanViewer() {
         }
       }
     }
-  }, [imageLoaded]);
+  }, [imageLoaded, history.length, saveToHistory, selectedColor]);
 
   // Update stroke color when color changes
   useEffect(() => {
@@ -220,19 +230,6 @@ export default function ScanViewer() {
     }
   }, [selectedColor]);
 
-  const saveToHistory = () => {
-    if (!canvasRef.current) return;
-    
-    const newState = canvasRef.current.toDataURL();
-    
-    // If we're not at the end of the history, truncate it
-    const newHistory = history.slice(0, historyIndex + 1);
-    
-    // Add the new state and update the index
-    newHistory.push(newState);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -596,6 +593,7 @@ export default function ScanViewer() {
                     Loading {selectedScan} scan for Patient {patientId}...
                   </div>
                 )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   ref={imageRef}
                   src={imagePath}
