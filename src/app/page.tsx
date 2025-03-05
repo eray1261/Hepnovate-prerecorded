@@ -83,6 +83,7 @@ export default function Home() {
   })
   const [labTestDate, setLabTestDate] = useState<string>("")
   const [websocketConnected, setWebsocketConnected] = useState(false)
+  const [authToken, setAuthToken] = useState<string>("");
   const labUnitMapping: { [key: string]: string } = {
     "ALT": "U/L",
     "AST": "U/L",
@@ -142,49 +143,28 @@ export default function Home() {
   }, [symptoms, vitals]);
 
   useEffect(() => {
-    const initializeWebSocket = () => {
-      if (websocketRef.current) {
-        websocketRef.current.close();
-      }
-
+    const getDeepgramToken = async () => {
       try {
-        websocketRef.current = new WebSocket('ws://localhost:3001');
+        const response = await fetch('/api/get-deepgram-token');
+        const data = await response.json();
         
-        websocketRef.current.onopen = () => {
-          console.log('WebSocket connected');
-          setWebsocketConnected(true);
+        if (data.token) {
+          setAuthToken(data.token);
           setError(null);
-        };
-
-        websocketRef.current.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.channel?.alternatives[0]?.transcript) {
-            const newTranscript = data.channel.alternatives[0].transcript;
-            setTranscription(prev => prev + ' ' + newTranscript);
-            detectSymptomsAndVitals(newTranscript);
-          }
-        };
-
-        websocketRef.current.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          setError('Connection error. Please try again.');
+        } else {
+          setError("Failed to get authentication token");
           setWebsocketConnected(false);
-        };
-
-        websocketRef.current.onclose = () => {
-          console.log('WebSocket disconnected');
-          setWebsocketConnected(false);
-        };
+        }
       } catch (err) {
-        console.error('Failed to initialize WebSocket:', err);
-        setError('Failed to initialize connection. Please refresh the page.');
+        console.error("Error getting Deepgram token:", err);
+        setError("Connection error. Please try again.");
         setWebsocketConnected(false);
       }
     };
-
-    initializeWebSocket();
-
-    // Clean up WebSocket on component unmount
+    
+    getDeepgramToken();
+    
+    // Clean up on component unmount
     return () => {
       if (websocketRef.current) {
         websocketRef.current.close();
@@ -193,7 +173,7 @@ export default function Home() {
         mediaRecorderRef.current.stop();
       }
     };
-  }, []); // Empty dependency array to run only once on mount
+  }, []);
 
   useEffect(() => {
     const loadCSVData = async () => {
@@ -431,59 +411,117 @@ export default function Home() {
 
   const startRecording = async () => {
     try {
-      // Ensure WebSocket is connected
-      if (!websocketConnected) {
-        setError("Connection not established. Trying to reconnect...");
-        if (websocketRef.current) {
-          websocketRef.current.close();
-        }
-        websocketRef.current = new WebSocket('ws://localhost:3001');
-        
-        // Wait for connection to establish before proceeding
-        await new Promise((resolve, reject) => {
-          if (!websocketRef.current) return reject("Failed to create WebSocket");
-          
-          websocketRef.current.onopen = () => {
-            setWebsocketConnected(true);
-            setError(null);
-            resolve(true);
-          };
-          
-          websocketRef.current.onerror = () => {
-            reject("Failed to connect to WebSocket server");
-          };
-          
-          // Set a timeout in case connection takes too long
-          setTimeout(() => reject("Connection timeout"), 5000);
-        });
+      // Make sure we have an auth token
+      if (!authToken) {
+        setError("Authentication not ready. Please try again.");
+        return;
       }
       
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0 && websocketRef.current?.readyState === WebSocket.OPEN) {
-          websocketRef.current.send(event.data);
-        }
+      // Initialize Deepgram WebSocket directly
+      websocketRef.current = new WebSocket('wss://api.deepgram.com/v1/listen', [
+        'token',
+        authToken
+      ]);
+      
+      // Set up WebSocket event handlers
+      websocketRef.current.onopen = () => {
+        console.log('Deepgram connection established');
+        setWebsocketConnected(true);
+        setError(null);
+        
+        // Configure Deepgram
+        const configMessage = {
+          sample_rate: 16000,
+          encoding: 'linear16',
+          channels: 1,
+          language: 'en',
+          model: 'nova-2',
+          interim_results: true,
+          endpointing: 300,
+        };
+        
+        websocketRef.current?.send(JSON.stringify(configMessage));
+        
+        // Now start recording
+        startMicrophoneRecording();
       };
 
-      mediaRecorderRef.current.start(1000);
+      websocketRef.current.onmessage = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.channel?.alternatives[0]?.transcript) {
+            const newTranscript = data.channel.alternatives[0].transcript;
+            setTranscription(prev => prev + ' ' + newTranscript);
+            detectSymptomsAndVitals(newTranscript);
+          }
+        } catch (err) {
+          console.error('Error parsing Deepgram response:', err);
+        }
+      };
+      
+      websocketRef.current.onerror = (event: Event) => {
+        console.error('Deepgram WebSocket error:', event);
+        setError('Connection error occurred');
+        setWebsocketConnected(false);
+        stopRecording();
+      };
+      
+      websocketRef.current.onclose = () => {
+        console.log('Deepgram connection closed');
+        setWebsocketConnected(false);
+      };
+      
+    } catch (err) {
+      console.error('Error starting Deepgram connection:', err);
+      setError('Failed to connect to transcription service');
+    }
+  };
+
+  const startMicrophoneRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Set up MediaRecorder
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      
+      mediaRecorderRef.current.ondataavailable = (event: BlobEvent) => {
+        if (event.data.size > 0 && websocketRef.current?.readyState === WebSocket.OPEN) {
+          // Convert Blob to ArrayBuffer before sending
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (websocketRef.current?.readyState === WebSocket.OPEN && reader.result) {
+              websocketRef.current.send(reader.result);
+            }
+          };
+          reader.readAsArrayBuffer(event.data);
+        }
+      };
+      
+      mediaRecorderRef.current.start(250); // Collect audio data every 250ms
       setIsRecording(true);
       setError(null);
     } catch (err) {
-      setError("Failed to start recording. Please check your microphone permissions or refresh the page.");
-      console.error("Recording error:", err);
+      console.error('Microphone error:', err);
+      setError('Failed to access microphone. Please check permissions.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    // Stop the media recorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
+    
+    // Close the WebSocket connection
+    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+      websocketRef.current.close();
+    }
+    
+    setIsRecording(false);
+    setWebsocketConnected(false);
   };
+
 
   // Reset function for symptoms, vitals, and transcription
   const resetData = () => {
