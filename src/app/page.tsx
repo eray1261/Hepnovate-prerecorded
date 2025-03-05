@@ -59,80 +59,73 @@ type PatientRecord = {
   [key: string]: string; // Allows for other lab result fields
 };
 
+const p1001TranscriptionData = [
+  {
+    timestamp: 2500,
+    text: "The patient has a fever of 102F"
+  },
+  {
+    timestamp: 4500,
+    text: " and a blood pressure of 90 over 120"
+  },
+  {
+    timestamp: 6500,
+    text: " and her heart beats at 72."
+  },
+  {
+    timestamp: 8500,
+    text: " She has pale skin"
+  },
+  {
+    timestamp: 10500,
+    text: " and shows signs of jaundice."
+  },
+  {
+    timestamp: 12500,
+    text: " She has abdominal pain for the past 3 days"
+  }
+];
+
 const mockTranscriptionData = [
   {
     patientId: "P1000",
-    transcription: [
-      {
-        timestamp: 2000,
-        text: "The patient is a 52-year-old male"
-      },
-      {
-        timestamp: 3000,
-        text: " with a temperature of 99.5°F,"
-      },
-      {
-        timestamp: 5000,
-        text: " blood pressure of 110 over 75,"
-      },
-      {
-        timestamp: 6000,
-        text: " and a heart rate of 80 beats per minute."
-      },
-      {
-        timestamp: 7000,
-        text: " He has yellowing of the skin and eyes,"
-      },
-      {
-        timestamp: 8000,
-        text: " dark urine, and persistent fatigue."
-      },
-      {
-        timestamp: 9000,
-        text: " He reports a loss of appetite"
-      },
-      {
-        timestamp: 10000,
-        text: " and dull pain in the upper right abdomen for the past week."
-      },
-      {
-        timestamp: 11000,
-        text: " His medical history includes occasional alcohol use"
-      },
-      {
-        timestamp: 12000,
-        text: " and recent unexplained weight loss."
-      }
-    ]
+    transcription: p1001TranscriptionData
   },
   {
     patientId: "P1001",
-    transcription: [
-      {
-        timestamp: 2000,
-        text: "The patient has a fever of 102F"
-      },
-      {
-        timestamp: 4000,
-        text: " and a blood pressure of 90 over 120"
-      },
-      {
-        timestamp: 6000,
-        text: " and her heart beats at 72."
-      },
-      {
-        timestamp: 8000,
-        text: " She has pale skin"
-      },
-      {
-        timestamp: 10000,
-        text: " and shows signs of jaundice."
-      },
-      {
-        timestamp: 12000,
-        text: " She has abdominal pain for the past 3 days"
-      }
-    ]
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1002",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1003",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1004",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1005",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1006",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1007",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1008",
+    transcription: p1001TranscriptionData
+  },
+  {
+    patientId: "P1009",
+    transcription: p1001TranscriptionData
   }
 ];
 
@@ -144,7 +137,10 @@ export default function Home() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const router = useRouter()
   const [selectedPatientId, setSelectedPatientId] = useState('P1000')
-  const [patientIds, setPatientIds] = useState<string[]>(['P1000', 'P1001', 'P1002', 'P1003'])
+  const [patientIds, setPatientIds] = useState<string[]>([
+    'P1000', 'P1001', 'P1002', 'P1003', 'P1004', 
+    'P1005', 'P1006', 'P1007', 'P1008', 'P1009'
+  ])
   const [labResults, setLabResults] = useState<LabResult[]>([])
   const [medicalHistory, setMedicalHistory] = useState<MedicalHistory>({
     activeConditions: [],
@@ -229,19 +225,20 @@ export default function Home() {
   }, []);
 
   // Update audio file when patient ID changes
-  useEffect(() => {
-    if (isPlaying) {
-      stopPlayback();
-    }
-    
-    if (audioRef.current) {
-      audioRef.current.src = `/audio/${selectedPatientId}.m4a`;
-      audioRef.current.addEventListener('ended', stopPlayback);
-    } else {
-      audioRef.current = new Audio(`/audio/${selectedPatientId}.m4a`);
-      audioRef.current.addEventListener('ended', stopPlayback);
-    }
-  }, [selectedPatientId]);
+useEffect(() => {
+  if (isPlaying) {
+    stopPlayback();
+  }
+  
+  // Always use P1001's audio file regardless of selectedPatientId
+  if (audioRef.current) {
+    audioRef.current.src = `/audio/P1001.m4a`;
+    audioRef.current.addEventListener('ended', stopPlayback);
+  } else {
+    audioRef.current = new Audio(`/audio/P1001.m4a`);
+    audioRef.current.addEventListener('ended', stopPlayback);
+  }
+}, [selectedPatientId]);
 
   // Load CSV data for lab results and medical history
   useEffect(() => {
