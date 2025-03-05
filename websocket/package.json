@@ -7,15 +7,16 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "ws": "^8.18.0",
     "@deepgram/sdk": "^3.11.1",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@types/express": "^5.0.0",
     "@types/node": "^20",
     "@types/ws": "^8.5.14",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5"
   }
 }
