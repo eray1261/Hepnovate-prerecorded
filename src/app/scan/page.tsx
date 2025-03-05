@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardHeader, CardTitle } from "@/components/card";
 import {  
@@ -16,12 +16,14 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { storeCurrentDiagnosis, getCurrentDiagnosis } from '@/services/diagnosisStorage';
+
 interface Point {
   x: number;
   y: number;
 }
 
-export default function ScanViewer() {
+// ScanViewerContent component that uses searchParams
+function ScanViewerContent() {
   const searchParams = useSearchParams();
   const [selectedScan, setSelectedScan] = useState('CT');
   const [scanName, setScanName] = useState('');
@@ -57,6 +59,7 @@ export default function ScanViewer() {
   ];
   // Add state to track if color picker is open
   const [showColorPicker, setShowColorPicker] = useState(false);
+  
   const saveToHistory = () => {
     if (!canvasRef.current) return;
     
@@ -658,5 +661,17 @@ export default function ScanViewer() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function ScanViewer() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex flex-col items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#80BCFF] mb-4"></div>
+      <p className="text-gray-600">Loading scan viewer...</p>
+    </div>}>
+      <ScanViewerContent />
+    </Suspense>
   );
 }
