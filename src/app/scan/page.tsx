@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardHeader, CardTitle } from "@/components/card";
 import { 
@@ -17,12 +17,14 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { storeCurrentDiagnosis, getCurrentDiagnosis } from '@/services/diagnosisStorage';
+
 interface Point {
   x: number;
   y: number;
 }
 
-export default function ScanViewer() {
+// Create a client component to handle the search params
+function ScanViewerContent() {
   const searchParams = useSearchParams();
   const [selectedScan, setSelectedScan] = useState('CT');
   const [scanName, setScanName] = useState('');
@@ -660,5 +662,26 @@ export default function ScanViewer() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function ScanViewerLoading() {
+  return (
+    <div className="min-h-screen bg-white flex flex-col">
+      <Header />
+      <div className="flex-1 container mx-auto p-4 flex items-center justify-center">
+        <div className="text-xl text-gray-500">Loading scan viewer...</div>
+      </div>
+    </div>
+  );
+}
+
+// Main component that wraps the content with Suspense
+export default function ScanViewer() {
+  return (
+    <Suspense fallback={<ScanViewerLoading />}>
+      <ScanViewerContent />
+    </Suspense>
   );
 }
