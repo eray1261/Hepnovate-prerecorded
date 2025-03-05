@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardHeader, CardTitle } from "@/components/card";
-import {  
+import { 
+  Move, 
   Pencil, 
   Circle, 
   Ruler, 
@@ -16,20 +17,12 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { storeCurrentDiagnosis, getCurrentDiagnosis } from '@/services/diagnosisStorage';
-
 interface Point {
   x: number;
   y: number;
 }
 
-interface PathData {
-  tool: string;
-  color: string;
-  points: Point[];
-}
-
-// ScanViewerContent component that uses searchParams
-function ScanViewerContent() {
+export default function ScanViewer() {
   const searchParams = useSearchParams();
   const [selectedScan, setSelectedScan] = useState('CT');
   const [scanName, setScanName] = useState('');
@@ -41,13 +34,15 @@ function ScanViewerContent() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [startPoint, setStartPoint] = useState<Point | null>(null);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const [textInput, setTextInput] = useState('');
   const [showTextInput, setShowTextInput] = useState(false);
-  const [textPosition, setTextPosition] = useState<Point | null>(null);
+  const [textPosition, setTextPosition] = useState<{ x: number; y: number } | null>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const [measurements, setMeasurements] = useState<{ start: Point, end: Point }[]>([]);
   const [isMeasuring, setIsMeasuring] = useState(false);
@@ -65,23 +60,7 @@ function ScanViewerContent() {
   ];
   // Add state to track if color picker is open
   const [showColorPicker, setShowColorPicker] = useState(false);
-  // Add a simpler version of path tracking, just to maintain the interface
-  const pathsRef = useRef<PathData[]>([]);
   
-  const saveToHistory = () => {
-    if (!canvasRef.current) return;
-    
-    const newState = canvasRef.current.toDataURL();
-    
-    // If we're not at the end of the history, truncate it
-    const newHistory = history.slice(0, historyIndex + 1);
-    
-    // Add the new state and update the index
-    newHistory.push(newState);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
   const handleGenerateDiagnosis = async () => {
     if (!canvasRef.current) return;
     setIsGenerating(true);
@@ -228,8 +207,7 @@ function ScanViewerContent() {
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageLoaded, history.length, selectedColor]);
+  }, [imageLoaded]);
 
   // Update stroke color when color changes
   useEffect(() => {
@@ -241,6 +219,20 @@ function ScanViewerContent() {
       }
     }
   }, [selectedColor]);
+
+  const saveToHistory = () => {
+    if (!canvasRef.current) return;
+    
+    const newState = canvasRef.current.toDataURL();
+    
+    // If we're not at the end of the history, truncate it
+    const newHistory = history.slice(0, historyIndex + 1);
+    
+    // Add the new state and update the index
+    newHistory.push(newState);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -342,26 +334,10 @@ function ScanViewerContent() {
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
       ctx.strokeStyle = selectedColor;
       ctx.fillStyle = selectedColor;
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      
-      // For all tools except text and measure, start a path
-      if (selectedTool !== 'text' && selectedTool !== 'measure') {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-      }
-      
-      // For the draw tool, create a new drawing path
-      if (selectedTool === 'draw') {
-        // Store the current point as the starting point of this path
-        pathsRef.current.push({
-          tool: 'draw',
-          color: selectedColor,
-          points: [{x, y}]
-        });
-      }
     }
     
     if (selectedTool === 'text') {
@@ -390,18 +366,9 @@ function ScanViewerContent() {
 
     switch (selectedTool) {
       case 'draw':
-        // Let's fix the drawing problem by NOT creating a new path here
-        // Just continue the current path
         ctx.lineTo(x, y);
         ctx.stroke();
-        
-        // Add this point to the current path data
-        if (pathsRef.current.length > 0) {
-          const currentPath = pathsRef.current[pathsRef.current.length - 1];
-          currentPath.points.push({x, y});
-        }
         break;
-        
       case 'circle':
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         loadCanvasState(historyIndex);
@@ -413,14 +380,12 @@ function ScanViewerContent() {
         ctx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
         ctx.stroke();
         break;
-        
       case 'eraser':
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineTo(x, y);
         ctx.stroke();
         ctx.globalCompositeOperation = 'source-over';
         break;
-        
       case 'measure':
         if (isMeasuring && startPoint) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -447,20 +412,11 @@ function ScanViewerContent() {
   };
 
   const stopDrawing = () => {
-    if (!isDrawing || !canvasRef.current) return;
-    
-    if (selectedTool === 'draw') {
-      // Don't do anything special for drawing, just save to history
-    } else if (selectedTool === 'circle' || selectedTool === 'measure') {
-      // For tools that clear and redraw, we need to finalize them
+    if (isDrawing) {
+      setIsDrawing(false);
+      saveToHistory();
     }
-    
-    setIsDrawing(false);
-    saveToHistory();
   };
-  
-  // We'll keep a simpler approach for now, removing the redrawPaths function
-  // If needed later, we can add it back
 
   const handleToolSelect = (tool: string) => {
     setSelectedTool(tool);
@@ -704,17 +660,5 @@ function ScanViewerContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-// Main component with Suspense boundary
-export default function ScanViewer() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-white flex flex-col items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#80BCFF] mb-4"></div>
-      <p className="text-gray-600">Loading scan viewer...</p>
-    </div>}>
-      <ScanViewerContent />
-    </Suspense>
   );
 }
