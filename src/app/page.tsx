@@ -68,39 +68,39 @@ const mockTranscriptionData = [
         text: "The patient is a 52-year-old male"
       },
       {
-        timestamp: 4000,
+        timestamp: 3000,
         text: " with a temperature of 99.5°F,"
       },
       {
-        timestamp: 6000,
+        timestamp: 5000,
         text: " blood pressure of 110 over 75,"
       },
       {
-        timestamp: 8000,
+        timestamp: 6000,
         text: " and a heart rate of 80 beats per minute."
       },
       {
-        timestamp: 10000,
+        timestamp: 7000,
         text: " He has yellowing of the skin and eyes,"
       },
       {
-        timestamp: 12000,
+        timestamp: 8000,
         text: " dark urine, and persistent fatigue."
       },
       {
-        timestamp: 14000,
+        timestamp: 9000,
         text: " He reports a loss of appetite"
       },
       {
-        timestamp: 16000,
+        timestamp: 10000,
         text: " and dull pain in the upper right abdomen for the past week."
       },
       {
-        timestamp: 18000,
+        timestamp: 11000,
         text: " His medical history includes occasional alcohol use"
       },
       {
-        timestamp: 20000,
+        timestamp: 12000,
         text: " and recent unexplained weight loss."
       }
     ]
