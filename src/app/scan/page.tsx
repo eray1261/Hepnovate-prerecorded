@@ -22,6 +22,12 @@ interface Point {
   y: number;
 }
 
+interface PathData {
+  tool: string;
+  color: string;
+  points: Point[];
+}
+
 // ScanViewerContent component that uses searchParams
 function ScanViewerContent() {
   const searchParams = useSearchParams();
@@ -35,13 +41,13 @@ function ScanViewerContent() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [startPoint, setStartPoint] = useState<Point | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const [textInput, setTextInput] = useState('');
   const [showTextInput, setShowTextInput] = useState(false);
-  const [textPosition, setTextPosition] = useState<{ x: number; y: number } | null>(null);
+  const [textPosition, setTextPosition] = useState<Point | null>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const [measurements, setMeasurements] = useState<{ start: Point, end: Point }[]>([]);
   const [isMeasuring, setIsMeasuring] = useState(false);
@@ -60,7 +66,7 @@ function ScanViewerContent() {
   // Add state to track if color picker is open
   const [showColorPicker, setShowColorPicker] = useState(false);
   // Add ref to store current paths
-  const pathsRef = useRef<any[]>([]);
+  const pathsRef = useRef<PathData[]>([]);
   
   const saveToHistory = () => {
     if (!canvasRef.current) return;
@@ -222,6 +228,7 @@ function ScanViewerContent() {
         }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageLoaded, history.length, selectedColor]);
 
   // Update stroke color when color changes
@@ -673,7 +680,6 @@ function ScanViewerContent() {
                     Loading {selectedScan} scan for Patient {patientId}...
                   </div>
                 )}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img 
                   ref={imageRef}
                   src={imagePath}
