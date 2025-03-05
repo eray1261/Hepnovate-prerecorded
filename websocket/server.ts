@@ -8,11 +8,18 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Fix CSP Issue: Allow WebSocket Connections
+// ✅ Explicitly set CSP headers using Render's environment variable
 app.use((_req, res, next) => {
-  res.setHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self' wss://your-websocket-server.onrender.com");
+  const cspDirectives = process.env.CSP_DIRECTIVES || "default-src 'self'; connect-src 'self' wss://your-websocket-server.onrender.com";
+  res.setHeader("Content-Security-Policy", cspDirectives);
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   next();
 });
+
+// ✅ Debug: Print CSP Directives in Logs
+console.log("🔍 CSP Directives from Render:", process.env.CSP_DIRECTIVES);
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
