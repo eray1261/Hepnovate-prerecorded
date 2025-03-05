@@ -8,9 +8,12 @@ dotenv.config();
 
 const app = express();
 
-// ✅ Fix: Set CSP Headers Correctly for WebSockets
+// ✅ Fix: Set Proper CSP Headers for WebSockets
 app.use((_req, res, next) => {
-  res.setHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self' ws: wss:;");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self' data: gap: ws: wss: 'unsafe-inline'; connect-src 'self' ws: wss:;"
+  );
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -18,7 +21,7 @@ app.use((_req, res, next) => {
 });
 
 // ✅ Debug: Print CSP Directives in Logs
-console.log("🔍 Applying CSP Headers: default-src 'self'; connect-src 'self' ws: wss:;");
+console.log("🔍 Applying CSP Headers: default-src 'self' data: gap: ws: wss: 'unsafe-inline'; connect-src 'self' ws: wss:;");
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
