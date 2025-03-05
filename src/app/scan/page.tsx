@@ -59,6 +59,8 @@ function ScanViewerContent() {
   ];
   // Add state to track if color picker is open
   const [showColorPicker, setShowColorPicker] = useState(false);
+  // Add ref to store current paths
+  const pathsRef = useRef<any[]>([]);
   
   const saveToHistory = () => {
     if (!canvasRef.current) return;
@@ -220,7 +222,7 @@ function ScanViewerContent() {
         }
       }
     }
-  }, [imageLoaded, history.length, saveToHistory, selectedColor]);
+  }, [imageLoaded, history.length, selectedColor]);
 
   // Update stroke color when color changes
   useEffect(() => {
@@ -232,7 +234,6 @@ function ScanViewerContent() {
       }
     }
   }, [selectedColor]);
-
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -334,10 +335,21 @@ function ScanViewerContent() {
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
+      // Start a new path
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.strokeStyle = selectedColor;
       ctx.fillStyle = selectedColor;
+      
+      // For the draw tool, create a new drawing path
+      if (selectedTool === 'draw') {
+        // Store the current point as the starting point of this path
+        pathsRef.current.push({
+          tool: 'draw',
+          color: selectedColor,
+          points: [{x, y}]
+        });
+      }
     }
     
     if (selectedTool === 'text') {
@@ -366,9 +378,21 @@ function ScanViewerContent() {
 
     switch (selectedTool) {
       case 'draw':
+        // Continue the current path
         ctx.lineTo(x, y);
         ctx.stroke();
+        
+        // Important: Create a new path segment to avoid connecting back
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        // Add this point to the current path
+        if (pathsRef.current.length > 0) {
+          const currentPath = pathsRef.current[pathsRef.current.length - 1];
+          currentPath.points.push({x, y});
+        }
         break;
+        
       case 'circle':
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         loadCanvasState(historyIndex);
@@ -380,12 +404,19 @@ function ScanViewerContent() {
         ctx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
         ctx.stroke();
         break;
+        
       case 'eraser':
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineTo(x, y);
         ctx.stroke();
+        
+        // Important: Create a new path segment
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
         ctx.globalCompositeOperation = 'source-over';
         break;
+        
       case 'measure':
         if (isMeasuring && startPoint) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -412,10 +443,56 @@ function ScanViewerContent() {
   };
 
   const stopDrawing = () => {
-    if (isDrawing) {
-      setIsDrawing(false);
-      saveToHistory();
+    if (!isDrawing || !canvasRef.current) return;
+    
+    const ctx = canvasRef.current.getContext('2d');
+    if (ctx) {
+      ctx.closePath(); // Close the current drawing path properly
+      
+      if (selectedTool === 'draw') {
+        // Finalize the path by redrawing it
+        redrawPaths();
+      }
     }
+    
+    setIsDrawing(false);
+    saveToHistory();
+  };
+  
+  // Function to redraw all paths (useful to ensure drawing persists)
+  const redrawPaths = () => {
+    if (!canvasRef.current) return;
+    
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+    
+    // Temporarily store current settings
+    const currentStrokeStyle = ctx.strokeStyle;
+    const currentLineWidth = ctx.lineWidth;
+    const currentLineCap = ctx.lineCap;
+    
+    // Redraw each path
+    pathsRef.current.forEach(path => {
+      if (path.tool === 'draw' && path.points.length > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = path.color;
+        ctx.moveTo(path.points[0].x, path.points[0].y);
+        
+        for (let i = 1; i < path.points.length; i++) {
+          ctx.lineTo(path.points[i].x, path.points[i].y);
+          ctx.stroke();
+          
+          // Start a new segment for each point to prevent connecting lines oddly
+          ctx.beginPath();
+          ctx.moveTo(path.points[i].x, path.points[i].y);
+        }
+      }
+    });
+    
+    // Restore original settings
+    ctx.strokeStyle = currentStrokeStyle;
+    ctx.lineWidth = currentLineWidth;
+    ctx.lineCap = currentLineCap;
   };
 
   const handleToolSelect = (tool: string) => {
