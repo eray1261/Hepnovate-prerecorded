@@ -5,12 +5,48 @@ import { HfInference } from '@huggingface/inference';
 
 const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
+interface Diagnosis {
+  name: string;
+  confidence: number;
+  findings: string[];
+  differential: string[];
+  plan: string[];
+  severity: 'Mild' | 'Moderate' | 'Severe';
+}
+
+interface Vitals {
+  temperature?: string | null;
+  bloodPressure?: string | null;
+  pulse?: string | null;
+}
+
+interface LabResult {
+  name: string;
+  value: string;
+  unit?: string;
+}
+
+interface MedicalCondition {
+  condition: string;
+  date: string;
+}
+
+interface Medication {
+  name: string;
+  dosage: string;
+}
+
+interface MedicalHistoryData {
+  activeConditions?: MedicalCondition[];
+  currentMedication?: Medication[];
+}
+
 interface WriteUpRequest {
-  diagnoses: any[];
+  diagnoses: Diagnosis[];
   symptoms: string[];
-  vitals?: any;
-  labResults?: any[];
-  medicalHistory?: any;
+  vitals?: Vitals;
+  labResults?: LabResult[];
+  medicalHistory?: MedicalHistoryData;
   physicianAssessment?: string;
   imageData?: string;
 }

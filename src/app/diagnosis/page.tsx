@@ -2,17 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { Header } from "@/components/layout/Header";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
+import { Card, CardHeader, CardTitle } from "@/components/card";
 import { AlertTriangle, ThumbsDown, RefreshCw } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { 
   storeCurrentDiagnosis, 
   getCurrentDiagnosis, 
   DiagnosisResult, 
-  Diagnosis, 
-  Vitals, 
-  LabResult, 
-  MedicalHistory 
+  Diagnosis 
 } from '@/services/diagnosisStorage';
 
 export default function DiagnosisViewer() {
