@@ -98,7 +98,7 @@ const p1000TranscriptionData = [
     text: "and abdominal pain for the past 3 days."
   },
   {
-    timestamp: 21000,
+    timestamp: 19000,
     text: "Okay, thank you. We will run some tests."
   }
 ];
