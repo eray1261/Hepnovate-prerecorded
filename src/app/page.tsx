@@ -62,46 +62,27 @@ type PatientRecord = {
 // P1000 transcription data
 const p1000TranscriptionData = [
   {
-    timestamp: 2000,
-    text: "Okay, so you have a temperature of 102F"
+    timestamp: 4000,
+    text: "You have a temperature of 102F and blood pressure of 90 over 120. How are you feeling?"
   },
   {
-    timestamp: 5000,
-    text: "blood pressure of 90 over 120, "
+    timestamp: 7000,
+    text: "I’m feeling unwell."
   },
   {
-    timestamp: 8000,
-    text: "and a pulse of 72."
+    timestamp:9000,
+    text: "What are your symptoms?"
   },
   {
-    timestamp: 10400,
-    text: "How are you feeling today?"
+    timestamp: 12000,
+    text: "I have pale skin and abdominal pain."
   },
   {
-    timestamp: 11000,
-    text: "I'm feeling quite unwell."
-  },
-  {
-    timestamp: 13000,
-    text: "Can you describe your symptoms?"
-  },
-  {
-    timestamp: 14500,
-    text: "I have pale skin,"
-  },
-  {
-    timestamp: 15400,
-    text: "jaundice,"
-  },
-  {
-    timestamp: 18000,
-    text: "and abdominal pain for the past 3 days."
-  },
-  {
-    timestamp: 19000,
-    text: "Okay, thank you. We will run some tests."
+    timestamp: 1400,
+    text: "Thanks. We’ll run some tests."
   }
 ];
+
 
 // Keep your existing P1001 transcription data
 const p1001TranscriptionData = [
