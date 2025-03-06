@@ -124,7 +124,7 @@ const mockTranscriptionData = [
   },
   {
     patientId: "P1002",
-    transcription: p1001TranscriptionData
+    transcription: p1000TranscriptionData
   },
   {
     patientId: "P1003",
@@ -132,7 +132,7 @@ const mockTranscriptionData = [
   },
   {
     patientId: "P1004",
-    transcription: p1001TranscriptionData
+    transcription: p1000TranscriptionData
   },
   {
     patientId: "P1005",
@@ -140,7 +140,7 @@ const mockTranscriptionData = [
   },
   {
     patientId: "P1006",
-    transcription: p1001TranscriptionData
+    transcription: p1000TranscriptionData
   },
   {
     patientId: "P1007",
@@ -148,7 +148,7 @@ const mockTranscriptionData = [
   },
   {
     patientId: "P1008",
-    transcription: p1001TranscriptionData
+    transcription: p1000TranscriptionData
   },
   {
     patientId: "P1009",
@@ -258,20 +258,16 @@ useEffect(() => {
     stopPlayback();
   }
   
+  // Determine which audio file to use
+  // Even patient IDs (P1000, P1002, etc.) use P1000.mp3 
+  // Odd patient IDs (P1001, P1003, etc.) use P1001.m4a
+  const isEvenPatientId = parseInt(selectedPatientId.replace('P', '')) % 2 === 0;
+  const audioFile = isEvenPatientId ? 'P1000.mp3' : 'P1001.m4a';
+  
   if (audioRef.current) {
-    // P1000 uses .mp3, others use P1001.m4a
-    const audioFile = selectedPatientId === 'P1000' 
-      ? `${selectedPatientId}.mp3` 
-      : 'P1001.m4a';
-    
     audioRef.current.src = `/audio/${audioFile}`;
     audioRef.current.addEventListener('ended', stopPlayback);
   } else {
-    // P1000 uses .mp3, others use P1001.m4a
-    const audioFile = selectedPatientId === 'P1000' 
-      ? `${selectedPatientId}.mp3` 
-      : 'P1001.m4a';
-    
     audioRef.current = new Audio(`/audio/${audioFile}`);
     audioRef.current.addEventListener('ended', stopPlayback);
   }
