@@ -59,6 +59,51 @@ type PatientRecord = {
   [key: string]: string; // Allows for other lab result fields
 };
 
+// P1000 transcription data
+const p1000TranscriptionData = [
+  {
+    timestamp: 2000,
+    text: "Okay, so you have a temperature of 102F"
+  },
+  {
+    timestamp: 5000,
+    text: "blood pressure of 90 over 120, "
+  },
+  {
+    timestamp: 8000,
+    text: "and a pulse of 72."
+  },
+  {
+    timestamp: 10400,
+    text: "How are you feeling today?"
+  },
+  {
+    timestamp: 11000,
+    text: "I'm feeling quite unwell."
+  },
+  {
+    timestamp: 13000,
+    text: "Can you describe your symptoms?"
+  },
+  {
+    timestamp: 14500,
+    text: "I have pale skin,"
+  },
+  {
+    timestamp: 15400,
+    text: "jaundice,"
+  },
+  {
+    timestamp: 18000,
+    text: "and abdominal pain for the past 3 days."
+  },
+  {
+    timestamp: 21000,
+    text: "Okay, thank you. We will run some tests."
+  }
+];
+
+// Keep your existing P1001 transcription data
 const p1001TranscriptionData = [
   {
     timestamp: 2500,
@@ -86,10 +131,11 @@ const p1001TranscriptionData = [
   }
 ];
 
+
 const mockTranscriptionData = [
   {
     patientId: "P1000",
-    transcription: p1001TranscriptionData
+    transcription: p1000TranscriptionData
   },
   {
     patientId: "P1001",
@@ -225,17 +271,27 @@ export default function Home() {
   }, []);
 
   // Update audio file when patient ID changes
+// Update audio file when patient ID changes
 useEffect(() => {
   if (isPlaying) {
     stopPlayback();
   }
   
-  // Always use P1001's audio file regardless of selectedPatientId
   if (audioRef.current) {
-    audioRef.current.src = `/audio/P1001.m4a`;
+    // P1000 uses .mp3, others use P1001.m4a
+    const audioFile = selectedPatientId === 'P1000' 
+      ? `${selectedPatientId}.mp3` 
+      : 'P1001.m4a';
+    
+    audioRef.current.src = `/audio/${audioFile}`;
     audioRef.current.addEventListener('ended', stopPlayback);
   } else {
-    audioRef.current = new Audio(`/audio/P1001.m4a`);
+    // P1000 uses .mp3, others use P1001.m4a
+    const audioFile = selectedPatientId === 'P1000' 
+      ? `${selectedPatientId}.mp3` 
+      : 'P1001.m4a';
+    
+    audioRef.current = new Audio(`/audio/${audioFile}`);
     audioRef.current.addEventListener('ended', stopPlayback);
   }
 }, [selectedPatientId]);
